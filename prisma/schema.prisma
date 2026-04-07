@@ -8,12 +8,44 @@ datasource db {
 }
 
 enum Role {
-    admin
-    peserta
+  admin
+  peserta
+}
+
+enum TipeSoal {
+  pilihan_ganda
+  esai
+}
+
+enum Babak {
+  knock_out
+  semi_final
+  final
 }
 
 model Tim {
   id    Int    @id @default(autoincrement())
   nama  String
   role  Role   @default(peserta)
+}
+
+model PaketSoal {
+  id          Int      @id @default(autoincrement())
+  nama        String   
+  babak       Babak    
+  
+  daftarSoal  Soal[]   
+}
+
+model Soal {
+  id            Int        @id @default(autoincrement())
+  pertanyaan    String     @db.Text
+  tipe          TipeSoal   
+  opsiJawaban   Json?      
+  
+  jawabanBenar  String     @db.Text
+  poin          Int        @default(10)
+  
+  paketSoalId   Int
+  paketSoal     PaketSoal  @relation(fields: [paketSoalId], references: [id], onDelete: Cascade)
 }
