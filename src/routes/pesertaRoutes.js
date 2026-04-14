@@ -1,9 +1,12 @@
+// src/routes/pesertaRoutes.js
 import express from 'express';
 import { pesertaController } from '../controllers/pesertaController.js';
-import { upload } from '../middleware/upload.js';
+import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/register', upload.single('foto'), pesertaController.registerTim);
+router.get('/soal-aktif', verifyToken, pesertaController.getSoalAktif);
+
+router.post('/submit-jawaban', verifyToken, pesertaController.submitJawaban);
 
 export default router;
