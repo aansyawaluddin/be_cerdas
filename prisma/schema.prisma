@@ -47,11 +47,11 @@ model Tim {
 
   grup        Int       @default(1) 
   tahapAktif  Babak     @default(penyisihan)
-  
   isEliminated Boolean  @default(false)
   
   skorBabak   SkorBabak[]
   riwayat     RiwayatJawaban[]
+  taruhan     TaruhanSoal[]
 }
 
 model SkorBabak {
@@ -84,13 +84,25 @@ model Soal {
   poin          Int        @default(25) 
   
   status        StatusSoal @default(belum)
-  
   waktuMulai    DateTime?  
   
   paketSoalId   Int
   paketSoal     PaketSoal  @relation(fields: [paketSoalId], references: [id], onDelete: Cascade)
 
   riwayat       RiwayatJawaban[]
+  taruhan       TaruhanSoal[]
+}
+
+model TaruhanSoal {
+  id        Int      @id @default(autoincrement())
+  timId     Int
+  soalId    Int
+  poin      Int      
+
+  tim       Tim      @relation(fields: [timId], references: [id], onDelete: Cascade)
+  soal      Soal     @relation(fields: [soalId], references: [id], onDelete: Cascade)
+
+  @@unique([timId, soalId])
 }
 
 model RiwayatJawaban {

@@ -1,4 +1,4 @@
-import { mulaiSiklusPaket } from '../sockets/gameHandler.js';
+import { mulaiSiklusPaket, mulaiFaseStrategi } from '../sockets/gameHandler.js';
 import prisma from '../utils/prisma.js';
 
 export const adminController = {
@@ -69,43 +69,32 @@ export const adminController = {
                 }
             });
 
-            return res.status(200).json({
-                success: true,
-                message: "Soal berhasil diperbarui",
-                data: updatedSoal
-            });
+            return res.status(200).json({ success: true, message: "Soal berhasil diperbarui", data: updatedSoal });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
     },
 
-    mulaiPaket: async (req, res) => {
+    mulaiPaketCerdas: async (req, res) => {
         try {
             const { paketId } = req.params;
             const io = req.app.get('io');
+            if (!io) return res.status(500).json({ message: "Socket belum siap." });
 
-            if (!io) {
-                return res.status(500).json({ success: false, message: "Server Real-time belum siap." });
+            const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+
+            if (paket.babak === 'semi_final' && !paket.nama.toLowerCase().includes('rebutan')) {
+
+                await mulaiFaseStrategi(io, paketId);
+                return res.status(200).json({ message: "Fase Strategi 3 Menit dimulai!" });
+
+            } else {
+                const soalDimulai = await mulaiSiklusPaket(io, paketId);
+                return res.status(200).json({ message: "Game menyala! Menampilkan soal." });
             }
-
-            const soalDimulai = await mulaiSiklusPaket(io, paketId);
-
-            if (!soalDimulai) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Gagal memulai. Semua soal di paket ini sudah selesai."
-                });
-            }
-
-            return res.status(200).json({
-                success: true,
-                message: `Mesin otomatis menyala! Menampilkan soal ID ${soalDimulai.id}. Selanjutnya berganti otomatis tiap 3 menit.`,
-                data: soalDimulai
-            });
 
         } catch (error) {
-            console.error("Error mulai paket:", error);
-            return res.status(500).json({ success: false, error: error.message });
+            return res.status(500).json({ error: error.message });
         }
     }
 };

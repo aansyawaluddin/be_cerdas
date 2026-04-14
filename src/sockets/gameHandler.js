@@ -4,6 +4,39 @@ let timerInterval = null;
 let sisaWaktu = 0;
 let soalAktifId = null;
 
+// FASE STRATEGI (KHUSUS SEMI FINAL)
+export const mulaiFaseStrategi = async (io, paketId) => {
+    try {
+        console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
+        sisaWaktu = 180;
+
+        io.emit('fase_strategi_mulai', { paketId, sisaWaktu });
+
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(async () => {
+            sisaWaktu--;
+            io.emit('timer_strategi_update', { sisaWaktu });
+
+            if (sisaWaktu <= 0) {
+                clearInterval(timerInterval);
+                console.log(`[GAME] Waktu Strategi Habis. Bersiap masuk ke Soal 1...`);
+                io.emit('fase_strategi_selesai', { message: 'Waktu habis! Mempersiapkan soal...' });
+
+                setTimeout(() => {
+                    mulaiSiklusPaket(io, paketId);
+                }, 5000);
+            }
+        }, 1000);
+
+        return true;
+    } catch (error) {
+        console.error("[ERROR STRATEGI]:", error);
+        return false;
+    }
+};
+
+// SIKLUS SOAL OTOMATIS (PENYISIHAN & SEMI FINAL)
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
         await prisma.soal.updateMany({
@@ -12,10 +45,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         const soalBerikutnya = await prisma.soal.findFirst({
-            where: {
-                paketSoalId: parseInt(paketId),
-                status: 'belum'
-            },
+            where: { paketSoalId: parseInt(paketId), status: 'belum' },
             orderBy: { id: 'asc' }
         });
 
@@ -31,12 +61,11 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         soalAktifId = soalAktif.id;
-        sisaWaktu = 180; 
+        sisaWaktu = 180;
 
         io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
         console.log(`[GAME] Menjalankan Soal ID: ${soalAktifId}`);
 
-        // Bersihkan timer lama jika ada
         if (timerInterval) clearInterval(timerInterval);
 
         timerInterval = setInterval(async () => {
@@ -44,7 +73,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
             io.emit('timer_update', { sisaWaktu });
 
             if (sisaWaktu <= 0) {
-                clearInterval(timerInterval); 
+                clearInterval(timerInterval);
 
                 await prisma.soal.update({
                     where: { id: soalAktifId },
@@ -58,7 +87,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
                 console.log("[GAME] Jeda 5 detik sebelum pindah soal otomatis...");
                 setTimeout(() => {
-                    mulaiSiklusPaket(io, paketId); 
+                    mulaiSiklusPaket(io, paketId);
                 }, 5000);
             }
         }, 1000);
@@ -71,57 +100,17 @@ export const mulaiSiklusPaket = async (io, paketId) => {
     }
 };
 
-
+// HANDLER KONEKSI DASAR SOCKET.IO
 export const gameSocketHandler = (io) => {
     io.on('connection', (socket) => {
         console.log(`⚡ Klien terhubung: ${socket.id}`);
-
-        socket.on('peserta_kirim_jawaban', async (data) => {
-            const { timId, jawabanTim } = data;
-
-            const soal = await prisma.soal.findUnique({ where: { id: soalAktifId } });
-
-            if (!soal || soal.status !== 'aktif') {
-                return socket.emit('error_game', { message: 'Soal tidak aktif atau waktu habis!' });
-            }
-
-            const lamaBerpikir = 180 - sisaWaktu;
-            const penguranganPoin = Math.floor(lamaBerpikir / 7);
-
-            let poinDidapat = 0;
-            const isBenar = jawabanTim.trim().toLowerCase() === soal.jawabanBenar.trim().toLowerCase();
-
-            if (isBenar) {
-                poinDidapat = Math.max(0, soal.poin - penguranganPoin);
-            }
-
-            await prisma.riwayatJawaban.create({
-                data: {
-                    timId,
-                    soalId: soalAktifId,
-                    jawabanTim,
-                    isBenar,
-                    poinDidapat
-                }
-            });
-
-            io.emit('update_layar_led', {
-                timId,
-                status: isBenar ? 'BENAR' : 'SALAH',
-                poinTambahan: poinDidapat,
-                waktuMenjawab: lamaBerpikir
-            });
-
-            socket.emit('feedback_jawaban', { success: true, poin: poinDidapat });
-        });
-
         socket.on('disconnect', () => {
             console.log(`🔌 Klien terputus: ${socket.id}`);
         });
     });
 };
 
-
+// OGIKA ELIMINASI 
 async function prosesEliminasiOtomatis(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({
@@ -132,66 +121,80 @@ async function prosesEliminasiOtomatis(io, soalId) {
         if (!soal) return;
 
         const paketSoalId = soal.paketSoalId;
+        const babakSekarang = soal.paketSoal.babak;
 
-        const jumlahSelesai = await prisma.soal.count({
-            where: { paketSoalId: paketSoalId, status: 'selesai' }
-        });
+        if (babakSekarang === 'semi_final') {
+            console.log(`[GAME] Soal Semi Final selesai. Menunggu aturan eliminasi...`);
+            // TODO: Logika eliminasi Semi Final akan dimasukkan ke sini nanti
+            return;
+        }
 
-        const titikEliminasi = [10, 15, 20, 25, 28, 31, 34, 37, 40];
+        // LOGIKA ELIMINASI PENYISIHAN
+        if (babakSekarang === 'penyisihan') {
+            const jumlahSelesai = await prisma.soal.count({
+                where: { paketSoalId: paketSoalId, status: 'selesai' }
+            });
 
-        if (!titikEliminasi.includes(jumlahSelesai)) return;
+            const titikEliminasi = [10, 15, 20, 25, 28, 31, 34, 37, 40];
 
-        const sampelRiwayat = await prisma.riwayatJawaban.findFirst({
-            where: { soal: { paketSoalId: paketSoalId } },
-            include: { tim: true }
-        });
+            if (!titikEliminasi.includes(jumlahSelesai)) return;
 
-        if (!sampelRiwayat) return;
+            const sampelRiwayat = await prisma.riwayatJawaban.findFirst({
+                where: { soal: { paketSoalId: paketSoalId } },
+                include: { tim: true }
+            });
 
-        const grupAktif = sampelRiwayat.tim.grup;
+            if (!sampelRiwayat) return;
 
-        const daftarTim = await prisma.tim.findMany({
-            where: { grup: grupAktif, tahapAktif: 'penyisihan', isEliminated: false },
-            include: {
-                riwayat: {
-                    where: { soal: { paketSoalId: paketSoalId } },
-                    include: { soal: true }
-                }
-            }
-        });
+            const grupAktif = sampelRiwayat.tim.grup;
 
-        const klasemen = daftarTim.map(tim => {
-            let totalPoin = 0;
-            let totalWaktu = 0;
-            tim.riwayat.forEach(r => {
-                totalPoin += r.poinDidapat;
-                if (r.isBenar && r.soal.waktuMulai) {
-                    const durasi = new Date(r.waktuMenjawab).getTime() - new Date(r.soal.waktuMulai).getTime();
-                    totalWaktu += durasi;
+            const daftarTim = await prisma.tim.findMany({
+                where: { grup: grupAktif, tahapAktif: 'penyisihan', isEliminated: false },
+                include: {
+                    riwayat: {
+                        where: { soal: { paketSoalId: paketSoalId } },
+                        include: { soal: true }
+                    }
                 }
             });
-            return { id: tim.id, nama: tim.nama, totalPoin, totalWaktu };
-        });
 
-        klasemen.sort((a, b) => {
-            if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
-            return b.totalWaktu - a.totalWaktu;
-        });
+            const klasemen = daftarTim.map(tim => {
+                let totalPoin = 0;
+                let totalWaktu = 0;
 
-        const timTerbawah = klasemen[0];
+                tim.riwayat.forEach(r => {
+                    totalPoin += r.poinDidapat;
+                    if (r.isBenar && r.soal.waktuMulai) {
+                        const durasi = new Date(r.waktuMenjawab).getTime() - new Date(r.soal.waktuMulai).getTime();
+                        totalWaktu += durasi;
+                    }
+                });
 
-        if (!timTerbawah) return;
+                return { id: tim.id, nama: tim.nama, totalPoin, totalWaktu };
+            });
 
-        await prisma.tim.update({
-            where: { id: timTerbawah.id },
-            data: { isEliminated: true }
-        });
+            klasemen.sort((a, b) => {
+                if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
+                return b.totalWaktu - a.totalWaktu;
+            });
 
-        io.emit('animasi_eliminasi', {
-            timId: timTerbawah.id,
-            nama: timTerbawah.nama,
-            pesan: `Gugur di soal ke-${jumlahSelesai}`
-        });
+            const timTerbawah = klasemen[0];
+
+            if (!timTerbawah) return;
+
+            await prisma.tim.update({
+                where: { id: timTerbawah.id },
+                data: { isEliminated: true }
+            });
+
+            console.log(`[ELIMINASI] ${timTerbawah.nama} tereliminasi (Poin: ${timTerbawah.totalPoin}).`);
+
+            io.emit('animasi_eliminasi', {
+                timId: timTerbawah.id,
+                nama: timTerbawah.nama,
+                pesan: `Gugur di soal ke-${jumlahSelesai}`
+            });
+        }
 
     } catch (error) {
         console.error("[ERROR ELIMINASI]:", error);

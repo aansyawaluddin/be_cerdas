@@ -11,6 +11,6 @@ router.get('/paket/:paketId/soal', adminController.getSoalByPaket);
 
 router.get('/soal/:id', adminController.getSoalById);
 router.put('/soal/:id', adminController.updateSoal);
-router.post('/paket/:paketId/mulai', adminController.mulaiPaket);
+router.post('/paket/:paketId/mulai', adminController.mulaiPaketCerdas);
 
 export default router;
