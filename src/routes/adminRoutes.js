@@ -1,10 +1,13 @@
 import express from 'express';
 import { adminController } from '../controllers/adminController.js';
 import { verifyToken, isAdmin } from '../middleware/auth.js';
+import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
 router.use(verifyToken, isAdmin);
+
+router.post('/tim', upload.single('fotoTim'), adminController.createTim);
 
 router.get('/paket', adminController.getPaketSoal);
 router.get('/paket/:paketId/soal', adminController.getSoalByPaket);

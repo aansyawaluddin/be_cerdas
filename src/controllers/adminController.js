@@ -1,7 +1,56 @@
+import bcrypt from 'bcrypt';
 import { mulaiSiklusPaket, mulaiFaseStrategi } from '../sockets/gameHandler.js';
 import prisma from '../utils/prisma.js';
 
 export const adminController = {
+
+    createTim: async (req, res) => {
+        try {
+            const { nama, grup } = req.body;
+
+            if (!nama) {
+                return res.status(400).json({ success: false, message: "Nama tim wajib diisi!" });
+            }
+
+            const username = nama.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash("123", salt);
+
+            const fotoTim = req.file ? req.file.filename : null;
+
+            const newTim = await prisma.tim.create({
+                data: {
+                    nama: nama,
+                    username: username,
+                    password: hashedPassword,
+                    fotoTim: fotoTim,
+                    grup: grup ? parseInt(grup) : 1,
+                    role: 'peserta'
+                }
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: "Tim berhasil didaftarkan!",
+                data: {
+                    id: newTim.id,
+                    nama: newTim.nama,
+                    username: newTim.username,
+                    grup: newTim.grup,
+                    fotoTim: newTim.fotoTim
+                }
+            });
+
+        } catch (error) {
+            console.error("Error create tim:", error);
+            if (error.code === 'P2002' && error.meta.target.includes('username')) {
+                return res.status(400).json({ success: false, message: "Terjadi bentrok username, silakan coba submit lagi." });
+            }
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
     getPaketSoal: async (req, res) => {
         try {
             const { babak } = req.query;

@@ -141,7 +141,6 @@ export const pesertaController = {
                 }
             }
 
-            // Simpan Riwayat & Update Skor
             await prisma.$transaction(async (tx) => {
                 await tx.riwayatJawaban.create({
                     data: {

@@ -29,8 +29,10 @@ app.set('io', io);
 
 gameSocketHandler(io);
 
-app.use('/api/auth', authRoutes);       
-app.use('/api/admin', adminRoutes);     
+app.use('/uploads', express.static('public/uploads'));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/peserta', pesertaRoutes);
 
 app.get('/', (req, res) => {
