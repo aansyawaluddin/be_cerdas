@@ -112,9 +112,24 @@ export const pesertaController = {
             const isBenar = jawabanTim.toString().trim().toLowerCase() === soal.jawabanBenar.trim().toLowerCase();
             let poinDidapat = 0;
 
+            // LOGIKA PENYISIHAN
             if (tim.tahapAktif === 'penyisihan') {
-                if (isBenar) poinDidapat = Math.max(0, soal.poin - Math.floor(durasiDetik / 7));
-            } else if (tim.tahapAktif === 'semi_final') {
+                if (isBenar) {
+                    const jumlahBenarSebelumnya = await prisma.riwayatJawaban.count({
+                        where: {
+                            soalId: soal.id,
+                            isBenar: true
+                        }
+                    });
+                    const poinPeringkat = [25, 23, 21, 19, 17, 15, 13, 11, 9, 7, 5, 1];
+                    poinDidapat = poinPeringkat[jumlahBenarSebelumnya] || 0;
+                } else {
+                    poinDidapat = 0;
+                }
+            }
+
+            // LOGIKA SEMI FINAL
+            else if (tim.tahapAktif === 'semi_final') {
                 if (soal.paketSoal.nama.toLowerCase().includes("rebutan")) {
                     poinDidapat = isBenar ? 20 : 0;
                 } else {
@@ -126,6 +141,7 @@ export const pesertaController = {
                 }
             }
 
+            // Simpan Riwayat & Update Skor
             await prisma.$transaction(async (tx) => {
                 await tx.riwayatJawaban.create({
                     data: {
