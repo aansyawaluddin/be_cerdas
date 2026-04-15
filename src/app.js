@@ -8,6 +8,7 @@ import { gameSocketHandler } from './sockets/gameHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import pesertaRoutes from './routes/pesertaRoutes.js';
+import ledRoutes from './routes/ledRoutes.js';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/uploads', express.static('public/uploads'));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/peserta', pesertaRoutes);
+app.use('/api/led', ledRoutes);
 
 app.get('/', (req, res) => {
     res.send('Server Cerdas Cermat Ready!');
