@@ -20,7 +20,14 @@ export const adminController = {
             const { paketId } = req.params;
             const soal = await prisma.soal.findMany({
                 where: { paketSoalId: parseInt(paketId) },
-                orderBy: { id: 'asc' }
+                orderBy: { id: 'asc' },
+                select: {
+                    id: true,
+                    pertanyaan: true,
+                    tipe: true,
+                    opsiJawaban: true,
+                    jawabanBenar: true,
+                }
             });
             return res.status(200).json({ success: true, data: soal });
         } catch (error) {

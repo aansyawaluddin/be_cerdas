@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🏃 Memulai seeding 48 Tim Peserta...');
 
-    const commonPassword = await bcrypt.hash('Peserta2026', 10);
+    const commonPassword = await bcrypt.hash('123', 10);
     const teamsData = [];
 
     for (let i = 1; i <= 48; i++) {

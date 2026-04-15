@@ -31,13 +31,24 @@ async function main() {
             const indexKategori = Math.floor((i - 1) / 10);
             const kategoriSoal = daftarKategori[indexKategori];
 
+            const urutanDiKategori = (i - 1) % 10;
+            const isPilihanGanda = urutanDiKategori < 5;
+
+            const tipeSoal = isPilihanGanda ? 'pilihan_ganda' : 'esai';
+            const teksPertanyaan = isPilihanGanda
+                ? `[${kategoriSoal.toUpperCase()}] Ini adalah contoh soal Pilihan Ganda nomor ${i}. Siapakah penemu konsep ini?`
+                : `[${kategoriSoal.toUpperCase()}] Ini adalah contoh soal Esai nomor ${i}. Jelaskan secara detail bagaimana konsep ini dapat diimplementasikan!`;
+
+            const opsiJawaban = isPilihanGanda ? ['Opsi A (Benar)', 'Opsi B (Salah)', 'Opsi C (Salah)', 'Opsi D (Salah)'] : null;
+            const jawabanBenar = isPilihanGanda ? 'Opsi A (Benar)' : 'Jawaban esai ini berisi penjelasan rinci mengenai konsep terkait.';
+
             dataSoal.push({
-                pertanyaan: `[${kategoriSoal.toUpperCase()}] Ini adalah contoh soal nomor ${i} untuk ${namaPaket}. Siapakah penemu konsep ini?`,
+                pertanyaan: teksPertanyaan,
                 kategori: kategoriSoal,
-                tipe: 'pilihan_ganda',
-                opsiJawaban: ['Opsi A (Benar)', 'Opsi B (Salah)', 'Opsi C (Salah)', 'Opsi D (Salah)'],
-                jawabanBenar: 'Opsi A (Benar)',
-                poin: 25,
+                tipe: tipeSoal,
+                opsiJawaban: opsiJawaban,
+                jawabanBenar: jawabanBenar,
+                poin: 25, 
                 status: 'belum',
                 waktuMulai: null,
                 paketSoalId: paket.id
@@ -50,7 +61,7 @@ async function main() {
     }
 
     console.log('🎉 Seeding Soal Selesai!');
-    console.log('📊 Total: 4 Paket Soal, 160 Pertanyaan.');
+    console.log('📊 Total: 4 Paket Soal (Isi tiap paket: 20 PG, 20 Esai).');
 }
 
 main()
