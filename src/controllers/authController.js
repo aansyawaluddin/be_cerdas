@@ -28,7 +28,7 @@ export const authController = {
             const token = jwt.sign(
                 { id: user.id, role: user.role },
                 rahasiaKey,
-                { expiresIn: '12h' }
+                { expiresIn: '1d' }
             );
 
             return res.status(200).json({
@@ -40,6 +40,18 @@ export const authController = {
         } catch (error) {
             console.error("Error login:", error);
             return res.status(500).json({ success: false, message: "Terjadi kesalahan server." });
+        }
+    },
+
+    logout: async (req, res) => {
+        try {
+            return res.status(200).json({
+                success: true,
+                message: "Logout berhasil!"
+            });
+        } catch (error) {
+            console.error("Error logout:", error);
+            return res.status(500).json({ success: false, message: "Terjadi kesalahan server saat logout." });
         }
     }
 };

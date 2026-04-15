@@ -121,7 +121,7 @@ export const pesertaController = {
                             isBenar: true
                         }
                     });
-                    const poinPeringkat = [25, 23, 21, 19, 17, 15, 13, 11, 9, 7, 5, 1];
+                    const poinPeringkat = [25, 23, 21, 19, 17, 14, 12, 10, 8, 6, 4, 2];
                     poinDidapat = poinPeringkat[jumlahBenarSebelumnya] || 0;
                 } else {
                     poinDidapat = 0;
