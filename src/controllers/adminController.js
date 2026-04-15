@@ -47,7 +47,6 @@ export const adminController = {
                     tipe: true,
                     opsiJawaban: true,
                     jawabanBenar: true,
-                    poin: true
                 }
             });
             if (!soal) {
@@ -103,5 +102,78 @@ export const adminController = {
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
-    }
+    },
+
+    getDashboardLive: async (req, res) => {
+        try {
+            const soalAktif = await prisma.soal.findFirst({
+                where: { status: 'aktif' },
+                include: { paketSoal: true }
+            });
+
+            let sisaWaktu = 0;
+            let targetBabak = 'penyisihan';
+            let targetGrup = null;
+
+            if (soalAktif) {
+                targetBabak = soalAktif.paketSoal.babak;
+
+                if (soalAktif.waktuMulai) {
+                    const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
+                    sisaWaktu = Math.max(0, 180 - selisihDetik);
+                }
+
+                if (targetBabak === 'penyisihan') {
+                    const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
+                    if (namaPaket.includes('a')) targetGrup = 1;
+                    else if (namaPaket.includes('b')) targetGrup = 2;
+                    else if (namaPaket.includes('c')) targetGrup = 3;
+                    else if (namaPaket.includes('d')) targetGrup = 4;
+                }
+            }
+
+            const aturanPencarian = {
+                role: 'peserta',
+                isEliminated: false,
+                tahapAktif: targetBabak
+            };
+
+            if (targetGrup !== null) {
+                aturanPencarian.grup = targetGrup;
+            }
+
+            const daftarTim = await prisma.tim.findMany({
+                where: aturanPencarian,
+                include: { skorBabak: true }
+            });
+
+            const leaderboard = daftarTim.map(tim => {
+                const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
+                return {
+                    id: tim.id,
+                    nama: tim.nama,
+                    poin: skor ? skor.poin : 0
+                };
+            }).sort((a, b) => b.poin - a.poin);
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    soalAktif: soalAktif ? {
+                        id: soalAktif.id,
+                        pertanyaan: soalAktif.pertanyaan,
+                        kategori: soalAktif.kategori,
+                        paketNama: soalAktif.paketSoal.nama,
+                        jawabanBenar: soalAktif.jawabanBenar
+                    } : null,
+                    sisaWaktuDetik: sisaWaktu,
+                    leaderboard: leaderboard
+                }
+            });
+
+        } catch (error) {
+            console.error("Error Get Dashboard Live:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 };
