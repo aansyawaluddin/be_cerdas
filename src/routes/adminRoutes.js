@@ -17,4 +17,8 @@ router.put('/soal/:id', adminController.updateSoal);
 router.post('/paket/:paketId/mulai', adminController.mulaiPaketCerdas);
 router.get('/dashboard-live', adminController.getDashboardLive);
 
+router.post('/pause', verifyToken, isAdmin, adminController.togglePauseGame);
+
+router.post('/paket/:paketId/reset', verifyToken, isAdmin, adminController.resetPaketTesting);
+
 export default router;

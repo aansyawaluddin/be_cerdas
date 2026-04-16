@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { mulaiSiklusPaket, mulaiFaseStrategi } from '../sockets/gameHandler.js';
+import { mulaiSiklusPaket, mulaiFaseStrategi, togglePause, forceStopTimer, getGameState } from '../sockets/gameHandler.js';
 import prisma from '../utils/prisma.js';
 
 export const adminController = {
@@ -153,6 +153,70 @@ export const adminController = {
         }
     },
 
+    togglePauseGame: async (req, res) => {
+        try {
+            const io = req.app.get('io');
+            if (!io) return res.status(500).json({ message: "Socket belum siap." });
+
+            const status = togglePause(io);
+
+            return res.status(200).json({
+                success: true,
+                message: status.isPaused ? "Game berhasil di-PAUSE!" : "Game kembali DILANJUTKAN!",
+                data: status
+            });
+        } catch (error) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    },
+
+    resetPaketTesting: async (req, res) => {
+        try {
+            const { paketId } = req.params;
+
+            forceStopTimer();
+
+            const paket = await prisma.paketSoal.findUnique({
+                where: { id: parseInt(paketId) }
+            });
+
+            if (!paket) {
+                return res.status(404).json({ success: false, message: "Paket tidak ditemukan!" });
+            }
+
+            await prisma.soal.updateMany({
+                where: { paketSoalId: parseInt(paketId) },
+                data: { status: 'belum', waktuMulai: null }
+            });
+
+            await prisma.riwayatJawaban.deleteMany({
+                where: { soal: { paketSoalId: parseInt(paketId) } }
+            });
+
+            await prisma.skorBabak.deleteMany({
+                where: { babak: paket.babak }
+            });
+
+            if (paket.babak === 'penyisihan') {
+                await prisma.tim.updateMany({
+                    where: { tahapAktif: 'penyisihan', isEliminated: true },
+                    data: { isEliminated: false }
+                });
+            }
+
+            const io = req.app.get('io');
+            if (io) io.emit('game_reset', { message: "Game telah di-reset oleh Admin." });
+
+            return res.status(200).json({
+                success: true,
+                message: `Paket Soal ID ${paketId}, riwayat jawaban, poin babak, dan status eliminasi berhasil di-reset menjadi nol!`
+            });
+        } catch (error) {
+            console.error("Error Reset Paket:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
     getDashboardLive: async (req, res) => {
         try {
             const soalAktif = await prisma.soal.findFirst({
@@ -164,10 +228,13 @@ export const adminController = {
             let targetBabak = 'penyisihan';
             let targetGrup = null;
 
+            const gameState = getGameState();
+
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
-
-                if (soalAktif.waktuMulai) {
+                if (gameState.soalAktifId === soalAktif.id) {
+                    sisaWaktu = gameState.sisaWaktu;
+                } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
                     sisaWaktu = Math.max(0, 180 - selisihDetik);
                 }

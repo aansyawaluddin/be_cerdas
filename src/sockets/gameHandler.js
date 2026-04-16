@@ -3,18 +3,22 @@ import prisma from '../utils/prisma.js';
 let timerInterval = null;
 let sisaWaktu = 0;
 let soalAktifId = null;
+let paketAktifId = null;
+let isPaused = false;
 
 // FASE STRATEGI (KHUSUS SEMI FINAL)
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
         console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
         sisaWaktu = 180;
+        paketAktifId = paketId;
 
         io.emit('fase_strategi_mulai', { paketId, sisaWaktu });
-
         if (timerInterval) clearInterval(timerInterval);
 
         timerInterval = setInterval(async () => {
+            if (isPaused) return;
+
             sisaWaktu--;
             io.emit('timer_strategi_update', { sisaWaktu });
 
@@ -28,10 +32,8 @@ export const mulaiFaseStrategi = async (io, paketId) => {
                 }, 5000);
             }
         }, 1000);
-
         return true;
     } catch (error) {
-        console.error("[ERROR STRATEGI]:", error);
         return false;
     }
 };
@@ -39,6 +41,9 @@ export const mulaiFaseStrategi = async (io, paketId) => {
 // SIKLUS SOAL OTOMATIS (PENYISIHAN & SEMI FINAL)
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
+        paketAktifId = paketId;
+        isPaused = false;
+
         await prisma.soal.updateMany({
             where: { status: 'aktif' },
             data: { status: 'selesai' }
@@ -69,6 +74,8 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         if (timerInterval) clearInterval(timerInterval);
 
         timerInterval = setInterval(async () => {
+            if (isPaused) return;
+
             sisaWaktu--;
             io.emit('timer_update', { sisaWaktu });
 
@@ -85,7 +92,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
                 await prosesEliminasiOtomatis(io, soalAktifId);
 
-                console.log("[GAME] Jeda 5 detik sebelum pindah soal otomatis...");
                 setTimeout(() => {
                     mulaiSiklusPaket(io, paketId);
                 }, 5000);
@@ -93,11 +99,36 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         }, 1000);
 
         return soalAktif;
-
     } catch (error) {
         console.error("[ERROR SIKLUS]:", error);
         return null;
     }
+};
+
+export const togglePause = (io) => {
+    if (!soalAktifId && !paketAktifId) {
+        throw new Error("Tidak ada game yang sedang berjalan.");
+    }
+
+    isPaused = !isPaused;
+
+    if (isPaused) {
+        console.log(`[GAME] DIJEDA (PAUSED). Sisa waktu tertahan di ${sisaWaktu} detik.`);
+        io.emit('game_paused', { message: "Game dihentikan sementara." });
+    } else {
+        console.log(`[GAME] DILANJUTKAN (RESUMED).`);
+        io.emit('game_resumed', { message: "Game dilanjutkan." });
+    }
+
+    return { isPaused, sisaWaktu };
+};
+
+export const forceStopTimer = () => {
+    if (timerInterval) clearInterval(timerInterval);
+    isPaused = false;
+    sisaWaktu = 0;
+    soalAktifId = null;
+    paketAktifId = null;
 };
 
 // HANDLER KONEKSI DASAR SOCKET.IO
@@ -108,6 +139,15 @@ export const gameSocketHandler = (io) => {
             console.log(`🔌 Klien terputus: ${socket.id}`);
         });
     });
+};
+
+export const getGameState = () => {
+    return {
+        isPaused,
+        sisaWaktu,
+        soalAktifId,
+        paketAktifId
+    };
 };
 
 // OGIKA ELIMINASI 

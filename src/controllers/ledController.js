@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma.js';
+import { getGameState } from '../sockets/gameHandler.js';
 
 export const ledController = {
     getLiveGameState: async (req, res) => {
@@ -12,8 +13,12 @@ export const ledController = {
             let dataSoal = null;
             let daftarTim = [];
 
+            const gameState = getGameState();
+
             if (soalAktif) {
-                if (soalAktif.waktuMulai) {
+                if (gameState.soalAktifId === soalAktif.id) {
+                    sisaWaktu = gameState.sisaWaktu;
+                } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
                     sisaWaktu = Math.max(0, 180 - selisihDetik);
                 }
@@ -37,10 +42,10 @@ export const ledController = {
                     else if (namaPaket.includes('d')) targetGrup = 4;
                 }
 
-                const filterTim = { 
-                    role: 'peserta', 
-                    isEliminated: false, 
-                    tahapAktif: soalAktif.paketSoal.babak 
+                const filterTim = {
+                    role: 'peserta',
+                    isEliminated: false,
+                    tahapAktif: soalAktif.paketSoal.babak
                 };
                 if (targetGrup !== null) filterTim.grup = targetGrup;
 
@@ -49,22 +54,22 @@ export const ledController = {
                     include: {
                         skorBabak: true,
                         riwayat: {
-                            where: { soalId: soalAktif.id } 
+                            where: { soalId: soalAktif.id }
                         }
                     }
                 });
 
                 daftarTim = teams.map(tim => {
                     const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
-                    const riwayatJawaban = tim.riwayat[0]; 
+                    const riwayatJawaban = tim.riwayat[0];
 
                     return {
                         id: tim.id,
                         nama: tim.nama,
                         fotoTim: tim.fotoTim,
-                        poin: skor ? skor.poin : 0, 
+                        poin: skor ? skor.poin : 0,
                     };
-                }).sort((a, b) => b.poin - a.poin); 
+                }).sort((a, b) => b.poin - a.poin);
             }
 
             return res.status(200).json({
