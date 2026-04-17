@@ -14,13 +14,14 @@ export const ledController = {
             let daftarTim = [];
 
             const gameState = getGameState();
+            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (soalAktif) {
                 if (gameState.soalAktifId === soalAktif.id) {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, 180 - selisihDetik);
+                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
 
                 dataSoal = {
@@ -77,6 +78,7 @@ export const ledController = {
                 data: {
                     soalAktif: dataSoal,
                     sisaWaktuDetik: sisaWaktu,
+                    isPaused: gameState.isPaused, 
                     timBertanding: daftarTim
                 }
             });

@@ -74,8 +74,6 @@ export const adminController = {
                     id: true,
                     pertanyaan: true,
                     tipe: true,
-                    opsiJawaban: true,
-                    jawabanBenar: true,
                 }
             });
             return res.status(200).json({ success: true, data: soal });
@@ -229,14 +227,16 @@ export const adminController = {
             let targetGrup = null;
 
             const gameState = getGameState();
+            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
+
                 if (gameState.soalAktifId === soalAktif.id) {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, 180 - selisihDetik);
+                    sisaWaktu = Math.max(0, DURASI - selisihDetik); 
                 }
 
                 if (targetBabak === 'penyisihan') {

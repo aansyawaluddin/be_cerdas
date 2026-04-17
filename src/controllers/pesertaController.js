@@ -81,11 +81,12 @@ export const pesertaController = {
 
             let sisaWaktu = 0;
             const gameState = getGameState();
+            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (gameState.soalAktifId === soalAktif.id) {
                 sisaWaktu = gameState.sisaWaktu;
             } else {
-                sisaWaktu = Math.max(0, 180 - Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000));
+                sisaWaktu = Math.max(0, DURASI - Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000));
             }
 
             return res.status(200).json({
@@ -119,6 +120,7 @@ export const pesertaController = {
 
             let durasiDetik = 0;
             const gameState = getGameState();
+            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (gameState.isPaused) {
                 return res.status(403).json({
@@ -127,12 +129,13 @@ export const pesertaController = {
                 });
             }
 
+            // MENGHITUNG DURASI MURNI
             if (gameState.soalAktifId === soal.id) {
                 if (gameState.sisaWaktu <= 0) return res.status(400).json({ success: false, message: "Waktu habis." });
-                durasiDetik = 180 - gameState.sisaWaktu;
+                durasiDetik = DURASI - gameState.sisaWaktu;
             } else {
                 durasiDetik = Math.floor((new Date().getTime() - soal.waktuMulai.getTime()) / 1000);
-                if (durasiDetik > 180) return res.status(400).json({ success: false, message: "Waktu habis." });
+                if (durasiDetik > DURASI) return res.status(400).json({ success: false, message: "Waktu habis." });
             }
 
             const isBenar = jawabanTim.toString().trim().toLowerCase() === soal.jawabanBenar.trim().toLowerCase();
@@ -167,7 +170,6 @@ export const pesertaController = {
                 }
             }
 
-            // SIMPAN KE DATABASE (TRANSAKSI)
             await prisma.$transaction(async (tx) => {
                 await tx.riwayatJawaban.create({
                     data: {
@@ -182,7 +184,6 @@ export const pesertaController = {
                 });
             });
 
-            // BROADCAST KE LAYAR LED
             const io = req.app.get('io');
             if (io) {
                 io.emit('update_layar_led', {

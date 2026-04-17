@@ -9,8 +9,10 @@ let isPaused = false;
 // FASE STRATEGI (KHUSUS SEMI FINAL)
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
+        const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
+
         console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
-        sisaWaktu = 180;
+        sisaWaktu = DURASI;
         paketAktifId = paketId;
 
         io.emit('fase_strategi_mulai', { paketId, sisaWaktu });
@@ -41,6 +43,8 @@ export const mulaiFaseStrategi = async (io, paketId) => {
 // SIKLUS SOAL OTOMATIS (PENYISIHAN & SEMI FINAL)
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
+        const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
+
         paketAktifId = paketId;
         isPaused = false;
 
@@ -66,7 +70,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         soalAktifId = soalAktif.id;
-        sisaWaktu = 180;
+        sisaWaktu = DURASI; // Gunakan variabel DURASI
 
         io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
         console.log(`[GAME] Menjalankan Soal ID: ${soalAktifId}`);
@@ -105,6 +109,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
     }
 };
 
+// FITUR PAUSE & FORCE STOP
 export const togglePause = (io) => {
     if (!soalAktifId && !paketAktifId) {
         throw new Error("Tidak ada game yang sedang berjalan.");
@@ -141,6 +146,7 @@ export const gameSocketHandler = (io) => {
     });
 };
 
+// EXPOSE GAME STATE
 export const getGameState = () => {
     return {
         isPaused,
@@ -150,7 +156,7 @@ export const getGameState = () => {
     };
 };
 
-// OGIKA ELIMINASI 
+// LOGIKA ELIMINASI 
 async function prosesEliminasiOtomatis(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({
@@ -165,7 +171,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
         if (babakSekarang === 'semi_final') {
             console.log(`[GAME] Soal Semi Final selesai. Menunggu aturan eliminasi...`);
-            // TODO: Logika eliminasi Semi Final akan dimasukkan ke sini nanti
             return;
         }
 
@@ -179,18 +184,19 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
             if (!titikEliminasi.includes(jumlahSelesai)) return;
 
-            const sampelRiwayat = await prisma.riwayatJawaban.findFirst({
-                where: { soal: { paketSoalId: paketSoalId } },
-                include: { tim: true }
-            });
+            let grupAktif = null;
+            const namaPaket = soal.paketSoal.nama.toLowerCase();
+            if (namaPaket.includes('a')) grupAktif = 1;
+            else if (namaPaket.includes('b')) grupAktif = 2;
+            else if (namaPaket.includes('c')) grupAktif = 3;
+            else if (namaPaket.includes('d')) grupAktif = 4;
 
-            if (!sampelRiwayat) return;
-
-            const grupAktif = sampelRiwayat.tim.grup;
+            if (grupAktif === null) return;
 
             const daftarTim = await prisma.tim.findMany({
                 where: { grup: grupAktif, tahapAktif: 'penyisihan', isEliminated: false },
                 include: {
+                    skorBabak: true,
                     riwayat: {
                         where: { soal: { paketSoalId: paketSoalId } },
                         include: { soal: true }
@@ -198,15 +204,21 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 }
             });
 
+            if (daftarTim.length === 0) return;
+
             const klasemen = daftarTim.map(tim => {
-                let totalPoin = 0;
+                const skor = tim.skorBabak.find(s => s.babak === 'penyisihan');
+                let totalPoin = skor ? skor.poin : 0;
+
                 let totalWaktu = 0;
 
                 tim.riwayat.forEach(r => {
-                    totalPoin += r.poinDidapat;
                     if (r.isBenar && r.soal.waktuMulai) {
-                        const durasi = new Date(r.waktuMenjawab).getTime() - new Date(r.soal.waktuMulai).getTime();
-                        totalWaktu += durasi;
+                        const waktuPencet = r.waktuMenjawab || r.createdAt;
+                        if (waktuPencet) {
+                            const durasi = new Date(waktuPencet).getTime() - new Date(r.soal.waktuMulai).getTime();
+                            totalWaktu += durasi;
+                        }
                     }
                 });
 
@@ -215,6 +227,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
             klasemen.sort((a, b) => {
                 if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
+
                 return b.totalWaktu - a.totalWaktu;
             });
 
@@ -227,7 +240,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 data: { isEliminated: true }
             });
 
-            console.log(`[ELIMINASI] ${timTerbawah.nama} tereliminasi (Poin: ${timTerbawah.totalPoin}).`);
+            console.log(`[ELIMINASI] ${timTerbawah.nama} tereliminasi (Poin: ${timTerbawah.totalPoin}, Keterlambatan: ${timTerbawah.totalWaktu}ms).`);
 
             io.emit('animasi_eliminasi', {
                 timId: timTerbawah.id,
