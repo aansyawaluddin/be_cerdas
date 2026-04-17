@@ -9,7 +9,7 @@ let isPaused = false;
 // FASE STRATEGI (KHUSUS SEMI FINAL)
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
-        const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
+        const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180;
 
         console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
         sisaWaktu = DURASI;
@@ -70,7 +70,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         soalAktifId = soalAktif.id;
-        sisaWaktu = DURASI; // Gunakan variabel DURASI
+        sisaWaktu = DURASI; 
 
         io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
         console.log(`[GAME] Menjalankan Soal ID: ${soalAktifId}`);

@@ -21,4 +21,6 @@ router.post('/pause', verifyToken, isAdmin, adminController.togglePauseGame);
 
 router.post('/paket/:paketId/reset', verifyToken, isAdmin, adminController.resetPaketTesting);
 
+router.post('/inisialisasi-semi-final', adminController.inisialisasiSemiFinal);
+
 export default router;

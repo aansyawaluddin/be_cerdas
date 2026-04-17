@@ -151,6 +151,45 @@ export const adminController = {
         }
     },
 
+    inisialisasiSemiFinal: async (req, res) => {
+        try {
+            const timLolos = await prisma.tim.findMany({
+                where: { tahapAktif: 'penyisihan', isEliminated: false, role: 'peserta' }
+            });
+
+            if (timLolos.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Tidak ada tim dari penyisihan yang bisa dipromosikan."
+                });
+            }
+            await prisma.$transaction(async (tx) => {
+                for (const tim of timLolos) {
+                    await tx.tim.update({
+                        where: { id: tim.id },
+                        data: { tahapAktif: 'semi_final' }
+                    });
+
+                    await tx.skorBabak.upsert({
+                        where: { timId_babak: { timId: tim.id, babak: 'semi_final' } },
+                        update: { poin: 1000 },
+                        create: { timId: tim.id, babak: 'semi_final', poin: 1000 }
+                    });
+                }
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: `Mantap! ${timLolos.length} tim berhasil naik kelas ke Semi Final dengan modal awal 1000 poin.`,
+                data: timLolos.map(t => ({ id: t.id, nama: t.nama }))
+            });
+
+        } catch (error) {
+            console.error("Error Inisialisasi Semi Final:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
     togglePauseGame: async (req, res) => {
         try {
             const io = req.app.get('io');
@@ -236,7 +275,7 @@ export const adminController = {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, DURASI - selisihDetik); 
+                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
 
                 if (targetBabak === 'penyisihan') {
