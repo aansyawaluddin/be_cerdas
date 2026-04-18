@@ -5,13 +5,15 @@ let sisaWaktu = 0;
 let soalAktifId = null;
 let paketAktifId = null;
 let isPaused = false;
+let faseAktif = 'idle'; 
 
-// FASE STRATEGI (KHUSUS SEMI FINAL)
+// FASE STRATEGI 
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180;
 
         console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
+        faseAktif = 'strategi';
         sisaWaktu = DURASI;
         paketAktifId = paketId;
 
@@ -40,12 +42,61 @@ export const mulaiFaseStrategi = async (io, paketId) => {
     }
 };
 
-// SIKLUS SOAL OTOMATIS (PENYISIHAN & SEMI FINAL)
+// FASE JEDA ISTIRAHAT
+export const mulaiJedaIstirahat = (io, currentPaketId) => {
+    const DURASI_JEDA = parseInt(process.env.DURASI_JEDA) || 180;
+
+    console.log(`[GAME] Memasuki Waktu Istirahat ${DURASI_JEDA} Detik...`);
+    faseAktif = 'jeda';
+    sisaWaktu = DURASI_JEDA;
+    isPaused = false;
+    soalAktifId = null;
+
+    io.emit('jeda_mulai', { sisaWaktu });
+
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(async () => {
+        if (isPaused) return;
+
+        sisaWaktu--;
+        io.emit('timer_jeda_update', { sisaWaktu });
+
+        if (sisaWaktu <= 0) {
+            clearInterval(timerInterval);
+            console.log(`[GAME] Waktu Istirahat Habis.`);
+
+            try {
+                const paketSelanjutnya = await prisma.paketSoal.findFirst({
+                    where: {
+                        babak: 'semi_final',
+                        id: { gt: parseInt(currentPaketId) }
+                    },
+                    orderBy: { id: 'asc' }
+                });
+
+                if (paketSelanjutnya) {
+                    console.log(`[GAME] Jeda Selesai. Masuk otomatis ke Fase Strategi Paket: ${paketSelanjutnya.id}`);
+                    io.emit('jeda_selesai', { message: "Istirahat selesai! Memasuki Fase Strategi Game selanjutnya." });
+
+                    mulaiFaseStrategi(io, paketSelanjutnya.id);
+                } else {
+                    io.emit('semi_final_selesai', { message: "Seluruh rangkaian Semi Final telah berakhir!" });
+                }
+            } catch (e) {
+                console.error("[ERROR JEDA]", e);
+            }
+        }
+    }, 1000);
+};
+
+//  SIKLUS SOAL OTOMATIS
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
         paketAktifId = paketId;
+        faseAktif = 'soal';
         isPaused = false;
 
         await prisma.soal.updateMany({
@@ -59,8 +110,15 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         if (!soalBerikutnya) {
-            io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
             console.log(`[GAME] Paket ${paketId} Selesai.`);
+            const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+
+            if (infoPaket && infoPaket.babak === 'semi_final') {
+                io.emit('paket_selesai', { message: "Game selesai! Memasuki waktu istirahat." });
+                mulaiJedaIstirahat(io, paketId);
+            } else {
+                io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
+            }
             return null;
         }
 
@@ -70,7 +128,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         soalAktifId = soalAktif.id;
-        sisaWaktu = DURASI; 
+        sisaWaktu = DURASI;
 
         io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
         console.log(`[GAME] Menjalankan Soal ID: ${soalAktifId}`);
@@ -134,6 +192,7 @@ export const forceStopTimer = () => {
     sisaWaktu = 0;
     soalAktifId = null;
     paketAktifId = null;
+    faseAktif = 'idle';
 };
 
 // HANDLER KONEKSI DASAR SOCKET.IO
@@ -152,7 +211,8 @@ export const getGameState = () => {
         isPaused,
         sisaWaktu,
         soalAktifId,
-        paketAktifId
+        paketAktifId,
+        faseAktif 
     };
 };
 
@@ -169,8 +229,51 @@ async function prosesEliminasiOtomatis(io, soalId) {
         const paketSoalId = soal.paketSoalId;
         const babakSekarang = soal.paketSoal.babak;
 
+        // LOGIKA ELIMINASI SEMI FINAL
         if (babakSekarang === 'semi_final') {
-            console.log(`[GAME] Soal Semi Final selesai. Menunggu aturan eliminasi...`);
+            const soalSisa = await prisma.soal.count({
+                where: { paketSoalId: paketSoalId, status: 'belum' }
+            });
+            const paketBerikutnya = await prisma.paketSoal.findFirst({
+                where: { babak: 'semi_final', id: { gt: paketSoalId } }
+            });
+
+            if (soalSisa === 0 && !paketBerikutnya) {
+                console.log(`[GAME] Rangkaian Semi Final Berakhir. Mengeksekusi Eliminasi 6 Tim Terbawah...`);
+
+                const daftarTimSemiFinal = await prisma.tim.findMany({
+                    where: { tahapAktif: 'semi_final', isEliminated: false },
+                    include: { skorBabak: true }
+                });
+
+                // Urutkan dari poin TERKECIL ke TERBESAR
+                const klasemenAkhir = daftarTimSemiFinal.map(tim => {
+                    const skor = tim.skorBabak.find(s => s.babak === 'semi_final');
+                    return {
+                        id: tim.id,
+                        nama: tim.nama,
+                        poin: skor ? skor.poin : 0
+                    };
+                }).sort((a, b) => a.poin - b.poin);
+
+                // Ambil 6 tim urutan teratas dari array yg sudah diurutkan dari terkecil (6 Terbawah)
+                const timGugur = klasemenAkhir.slice(0, 6);
+
+                for (const tim of timGugur) {
+                    await prisma.tim.update({
+                        where: { id: tim.id },
+                        data: { isEliminated: true }
+                    });
+
+                    console.log(`[ELIMINASI SEMI FINAL] ${tim.nama} Gugur. (Poin: ${tim.poin})`);
+
+                    io.emit('animasi_eliminasi', {
+                        timId: tim.id,
+                        nama: tim.nama,
+                        pesan: `Gugur di Babak Semi Final (Poin Akhir: ${tim.poin})`
+                    });
+                }
+            }
             return;
         }
 
@@ -227,7 +330,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
             klasemen.sort((a, b) => {
                 if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
-
                 return b.totalWaktu - a.totalWaktu;
             });
 
@@ -240,7 +342,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 data: { isEliminated: true }
             });
 
-            console.log(`[ELIMINASI] ${timTerbawah.nama} tereliminasi (Poin: ${timTerbawah.totalPoin}, Keterlambatan: ${timTerbawah.totalWaktu}ms).`);
+            console.log(`[ELIMINASI PENYISIHAN] ${timTerbawah.nama} tereliminasi (Poin: ${timTerbawah.totalPoin}, Keterlambatan: ${timTerbawah.totalWaktu}ms).`);
 
             io.emit('animasi_eliminasi', {
                 timId: timTerbawah.id,

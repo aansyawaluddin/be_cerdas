@@ -5,12 +5,34 @@ export const pesertaController = {
     getSoalStrategi: async (req, res) => {
         try {
             const { paketId } = req.params;
+            const gameState = getGameState();
+
+            if (gameState.faseAktif !== 'strategi') {
+                return res.status(403).json({
+                    success: false,
+                    message: "Akses ditolak! Saat ini bukan sesi penyusunan strategi."
+                });
+            }
+
+            if (parseInt(paketId) !== parseInt(gameState.paketAktifId)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Akses ditolak! Anda mencoba mengakses paket soal yang salah."
+                });
+            }
+
             const soalStrategi = await prisma.soal.findMany({
                 where: { paketSoalId: parseInt(paketId) },
                 select: { id: true, kategori: true },
                 orderBy: { id: 'asc' }
             });
-            return res.status(200).json({ success: true, data: soalStrategi });
+
+            return res.status(200).json({
+                success: true,
+                sisaWaktuDetik: gameState.sisaWaktu,
+                data: soalStrategi
+            });
+
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
@@ -20,6 +42,21 @@ export const pesertaController = {
         try {
             const timId = req.user.id;
             const { daftarTaruhan } = req.body;
+            const gameState = getGameState();
+
+            if (gameState.faseAktif !== 'strategi') {
+                return res.status(403).json({
+                    success: false,
+                    message: "Akses ditolak! Saat ini bukan sesi waktu untuk menyusun strategi taruhan."
+                });
+            }
+
+            if (gameState.isPaused) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Tahan! Game sedang di-jeda (Paused)."
+                });
+            }
 
             if (!Array.isArray(daftarTaruhan) || daftarTaruhan.length !== 10) {
                 return res.status(400).json({ success: false, message: "Harus memasukkan taruhan untuk tepat 10 soal!" });

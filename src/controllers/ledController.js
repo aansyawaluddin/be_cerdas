@@ -4,19 +4,34 @@ import { getGameState } from '../sockets/gameHandler.js';
 export const ledController = {
     getLiveGameState: async (req, res) => {
         try {
+            const gameState = getGameState();
+            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
+
+            let sisaWaktu = gameState.sisaWaktu;
+            let dataSoal = null;
+            let daftarTim = [];
+            let babakAktif = null;
+            let paketNama = null;
+
+            if (gameState.paketAktifId) {
+                const paket = await prisma.paketSoal.findUnique({
+                    where: { id: parseInt(gameState.paketAktifId) }
+                });
+                if (paket) {
+                    babakAktif = paket.babak;
+                    paketNama = paket.nama;
+                }
+            }
+
             const soalAktif = await prisma.soal.findFirst({
                 where: { status: 'aktif' },
                 include: { paketSoal: true }
             });
 
-            let sisaWaktu = 0;
-            let dataSoal = null;
-            let daftarTim = [];
-
-            const gameState = getGameState();
-            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
-
             if (soalAktif) {
+                babakAktif = soalAktif.paketSoal.babak;
+                paketNama = soalAktif.paketSoal.nama;
+
                 if (gameState.soalAktifId === soalAktif.id) {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
@@ -33,20 +48,23 @@ export const ledController = {
                     paketNama: soalAktif.paketSoal.nama,
                     babak: soalAktif.paketSoal.babak
                 };
+            }
 
+            if (babakAktif) {
                 let targetGrup = null;
-                if (soalAktif.paketSoal.babak === 'penyisihan') {
-                    const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
-                    if (namaPaket.includes('a')) targetGrup = 1;
-                    else if (namaPaket.includes('b')) targetGrup = 2;
-                    else if (namaPaket.includes('c')) targetGrup = 3;
-                    else if (namaPaket.includes('d')) targetGrup = 4;
+
+                if (babakAktif === 'penyisihan' && paketNama) {
+                    const namaP = paketNama.toLowerCase();
+                    if (namaP.includes('a')) targetGrup = 1;
+                    else if (namaP.includes('b')) targetGrup = 2;
+                    else if (namaP.includes('c')) targetGrup = 3;
+                    else if (namaP.includes('d')) targetGrup = 4;
                 }
 
                 const filterTim = {
                     role: 'peserta',
                     isEliminated: false,
-                    tahapAktif: soalAktif.paketSoal.babak
+                    tahapAktif: babakAktif
                 };
                 if (targetGrup !== null) filterTim.grup = targetGrup;
 
@@ -54,21 +72,22 @@ export const ledController = {
                     where: filterTim,
                     include: {
                         skorBabak: true,
-                        riwayat: {
+                        riwayat: soalAktif ? {
                             where: { soalId: soalAktif.id }
-                        }
+                        } : false
                     }
                 });
 
                 daftarTim = teams.map(tim => {
                     const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
-                    const riwayatJawaban = tim.riwayat[0];
+                    const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
 
                     return {
                         id: tim.id,
                         nama: tim.nama,
                         fotoTim: tim.fotoTim,
                         poin: skor ? skor.poin : 0,
+                        statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU'
                     };
                 }).sort((a, b) => b.poin - a.poin);
             }
@@ -76,9 +95,10 @@ export const ledController = {
             return res.status(200).json({
                 success: true,
                 data: {
+                    babakAktif: babakAktif,
                     soalAktif: dataSoal,
                     sisaWaktuDetik: sisaWaktu,
-                    isPaused: gameState.isPaused, 
+                    isPaused: gameState.isPaused,
                     timBertanding: daftarTim
                 }
             });
