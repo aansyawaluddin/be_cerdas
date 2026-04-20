@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma.js';
 
 let timerInterval = null;
@@ -5,9 +6,11 @@ let sisaWaktu = 0;
 let soalAktifId = null;
 let paketAktifId = null;
 let isPaused = false;
-let faseAktif = 'idle';
+let faseAktif = 'idle'; // PENANDA FASE: idle | strategi | soal | jeda
 
-// FASE STRATEGI 
+// ==========================================
+// 1. FASE STRATEGI (INPUT TARUHAN SEMI FINAL)
+// ==========================================
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180;
@@ -42,7 +45,9 @@ export const mulaiFaseStrategi = async (io, paketId) => {
     }
 };
 
-// FASE JEDA ISTIRAHAT
+// ==========================================
+// 2. FASE JEDA ISTIRAHAT (ANTAR GAME)
+// ==========================================
 export const mulaiJedaIstirahat = (io, currentPaketId) => {
     const DURASI_JEDA = parseInt(process.env.DURASI_JEDA) || 180;
 
@@ -67,6 +72,7 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
             console.log(`[GAME] Waktu Istirahat Habis.`);
 
             try {
+                // MENCARI PAKET GAME SELANJUTNYA
                 const paketSelanjutnya = await prisma.paketSoal.findFirst({
                     where: {
                         babak: 'semi_final',
@@ -79,6 +85,7 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
                     console.log(`[GAME] Jeda Selesai. Masuk otomatis ke Fase Strategi Paket: ${paketSelanjutnya.id}`);
                     io.emit('jeda_selesai', { message: "Istirahat selesai! Memasuki Fase Strategi Game selanjutnya." });
 
+                    // KEMBALI KE FASE STRATEGI
                     mulaiFaseStrategi(io, paketSelanjutnya.id);
                 } else {
                     io.emit('semi_final_selesai', { message: "Seluruh rangkaian Semi Final telah berakhir!" });
@@ -90,7 +97,9 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
     }, 1000);
 };
 
-//  SIKLUS SOAL OTOMATIS
+// ==========================================
+// 3. SIKLUS SOAL OTOMATIS (GAME BERJALAN)
+// ==========================================
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
@@ -115,6 +124,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
             if (infoPaket && infoPaket.babak === 'semi_final') {
                 io.emit('paket_selesai', { message: "Game selesai! Memasuki waktu istirahat." });
+                // JIKA SOAL HABIS (GAME SELESAI) -> MASUK FASE JEDA
                 mulaiJedaIstirahat(io, paketId);
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
@@ -167,7 +177,9 @@ export const mulaiSiklusPaket = async (io, paketId) => {
     }
 };
 
-// FITUR PAUSE & FORCE STOP
+// ==========================================
+// 4. FITUR PAUSE & FORCE STOP
+// ==========================================
 export const togglePause = (io) => {
     if (!soalAktifId && !paketAktifId) {
         throw new Error("Tidak ada game yang sedang berjalan.");
@@ -195,17 +207,9 @@ export const forceStopTimer = () => {
     faseAktif = 'idle';
 };
 
-// HANDLER KONEKSI DASAR SOCKET.IO
-export const gameSocketHandler = (io) => {
-    io.on('connection', (socket) => {
-        console.log(`⚡ Klien terhubung: ${socket.id}`);
-        socket.on('disconnect', () => {
-            console.log(`🔌 Klien terputus: ${socket.id}`);
-        });
-    });
-};
-
-// EXPOSE GAME STATE
+// ==========================================
+// 5. EXPOSE GAME STATE
+// ==========================================
 export const getGameState = () => {
     return {
         isPaused,
@@ -216,7 +220,75 @@ export const getGameState = () => {
     };
 };
 
-// LOGIKA ELIMINASI 
+// ==========================================
+// 6. HANDLER KONEKSI DASAR SOCKET.IO (DENGAN AUTH)
+// ==========================================
+export const gameSocketHandler = (io) => {
+
+    // MIDDLEWARE AUTHENTICATION
+    io.use((socket, next) => {
+        const token = socket.handshake.auth?.token;
+
+        // BYPASS UNTUK LAYAR LED
+        if (!token) {
+            console.log("⚠️ Klien tanpa token terhubung. Otomatis masuk sebagai Layar LED.");
+            socket.user = { role: 'led', username: 'Layar Panggung' };
+            return next();
+        }
+
+        try {
+            const decoded = jwt.verify(
+                token,
+                process.env.JWT_SECRET || 'rahasia_cerdas_cermat_2026'
+            );
+            socket.user = decoded;
+            next();
+        } catch (err) {
+            console.log("❌ Token socket tidak valid.");
+            next(new Error("Token tidak valid"));
+        }
+    });
+
+    io.on('connection', (socket) => {
+        const role = socket.user?.role;
+        const username = socket.user?.username || 'Unknown';
+
+        console.log(`⚡ Klien terhubung: [${socket.id}] | Role: ${role} | User: ${username}`);
+
+        // JOIN ROOM & SINKRONISASI STATE RECONNECT
+        if (role === 'admin') {
+            socket.join('admin');
+        } else if (role === 'peserta') {
+            socket.join('peserta');
+
+            const state = getGameState();
+
+            if (state.faseAktif === 'soal' && state.soalAktifId) {
+                socket.emit('game_mulai', {
+                    soalId: state.soalAktifId,
+                    sisaWaktu: state.sisaWaktu
+                });
+            } else if (state.faseAktif === 'strategi' && state.paketAktifId) {
+                socket.emit('fase_strategi_mulai', {
+                    paketId: state.paketAktifId,
+                    sisaWaktu: state.sisaWaktu
+                });
+            } else if (state.faseAktif === 'jeda') {
+                socket.emit('jeda_mulai', { sisaWaktu: state.sisaWaktu });
+            }
+        } else {
+            socket.join('led');
+        }
+
+        socket.on('disconnect', () => {
+            console.log(`🔌 Klien terputus: [${socket.id}] | User: ${username}`);
+        });
+    });
+};
+
+// ==========================================
+// 7. LOGIKA ELIMINASI OTOMATIS
+// ==========================================
 async function prosesEliminasiOtomatis(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({
@@ -229,7 +301,9 @@ async function prosesEliminasiOtomatis(io, soalId) {
         const paketSoalId = soal.paketSoalId;
         const babakSekarang = soal.paketSoal.babak;
 
-        // LOGIKA ELIMINASI SEMI FINAL
+        // --------------------------------------------------------
+        // LOGIKA ELIMINASI SEMI FINAL (KHUSUS DI AKHIR GAME 5)
+        // --------------------------------------------------------
         if (babakSekarang === 'semi_final') {
             const soalSisa = await prisma.soal.count({
                 where: { paketSoalId: paketSoalId, status: 'belum' }
@@ -238,6 +312,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 where: { babak: 'semi_final', id: { gt: paketSoalId } }
             });
 
+            // Eksekusi HANYA JIKA ini soal terakhir dari paket terakhir
             if (soalSisa === 0 && !paketBerikutnya) {
                 console.log(`[GAME] Rangkaian Semi Final Berakhir. Mengeksekusi Eliminasi 6 Tim Terbawah...`);
 
@@ -256,7 +331,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     };
                 }).sort((a, b) => a.poin - b.poin);
 
-                // Ambil 6 tim urutan teratas dari array yg sudah diurutkan dari terkecil (6 Terbawah)
+                // Ambil 6 tim terbawah
                 const timGugur = klasemenAkhir.slice(0, 6);
 
                 for (const tim of timGugur) {
@@ -277,7 +352,9 @@ async function prosesEliminasiOtomatis(io, soalId) {
             return;
         }
 
-        // LOGIKA ELIMINASI PENYISIHAN
+        // --------------------------------------------------------
+        // LOGIKA ELIMINASI PENYISIHAN (TIDAK DIUBAH SAMA SEKALI)
+        // --------------------------------------------------------
         if (babakSekarang === 'penyisihan') {
             const jumlahSelesai = await prisma.soal.count({
                 where: { paketSoalId: paketSoalId, status: 'selesai' }
@@ -355,74 +432,3 @@ async function prosesEliminasiOtomatis(io, soalId) {
         console.error("[ERROR ELIMINASI]:", error);
     }
 }
-
-export const gameSocketHandler = (io) => {
-
-    // ── 1. AUTHENTICATION MIDDLEWARE ──
-    io.use((socket, next) => {
-        // Ambil token dari handshake auth (Frontend harus mengirim ini saat inisialisasi socket)
-        const token = socket.handshake.auth?.token;
-
-        if (!token) {
-            console.log("❌ Klien mencoba connect tanpa token.");
-            return next(new Error("Token tidak ada"));
-        }
-
-        try {
-            // Verifikasi token (Pastikan nama variabel .env sesuai dengan yang Anda pakai di login)
-            const decoded = jwt.verify(
-                token,
-                process.env.JWT_SECRET || 'rahasia_cerdas_cermat_2026'
-            );
-
-            // Simpan data user ke dalam object socket untuk dipakai nanti
-            socket.user = decoded;
-            next();
-        } catch (err) {
-            console.log("❌ Token socket tidak valid.");
-            next(new Error("Token tidak valid"));
-        }
-    });
-
-    // ── 2. SAAT CLIENT BERHASIL TERHUBUNG ──
-    io.on('connection', (socket) => {
-        const role = socket.user?.role;
-        const username = socket.user?.username || 'Unknown';
-
-        console.log(`⚡ Klien terhubung: [${socket.id}] | Role: ${role} | User: ${username}`);
-
-        // ── 3. JOIN ROOM BERDASARKAN ROLE ──
-        if (role === 'admin') {
-            socket.join('admin');
-        } else if (role === 'peserta') {
-            socket.join('peserta');
-
-            // ── 4. SINKRONISASI STATE JIKA PESERTA BARU CONNECT / RECONNECT ──
-            // Ini menjawab "Masalah 2" dari FE: Event terlewat jika terlambat connect.
-            const state = getGameState();
-
-            if (state.faseAktif === 'soal' && state.soalAktifId) {
-                // Jika game sedang jalan, langsung kirim event 'game_mulai' eksklusif ke dia
-                socket.emit('game_mulai', {
-                    soalId: state.soalAktifId,
-                    sisaWaktu: state.sisaWaktu
-                });
-            } else if (state.faseAktif === 'strategi' && state.paketAktifId) {
-                // Jika sedang strategi, kirim event strategi
-                socket.emit('fase_strategi_mulai', {
-                    paketId: state.paketAktifId,
-                    sisaWaktu: state.sisaWaktu
-                });
-            } else if (state.faseAktif === 'jeda') {
-                socket.emit('jeda_mulai', { sisaWaktu: state.sisaWaktu });
-            }
-        } else {
-            // Layar LED biasanya tidak punya token khusus, atau Anda buat token dengan role 'led'
-            socket.join('led');
-        }
-
-        socket.on('disconnect', () => {
-            console.log(`🔌 Klien terputus: [${socket.id}] | User: ${username}`);
-        });
-    });
-};
