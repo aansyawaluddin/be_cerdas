@@ -15,7 +15,7 @@ export const verifyToken = (req, res, next) => {
             return res.status(401).json({ success: false, message: "Sesi telah habis atau token tidak valid! Silakan login ulang." });
         }
 
-        req.user = decoded;
+        req.user = decoded; 
         next();
     });
 };

@@ -33,6 +33,7 @@ export const authController = {
 
             return res.status(200).json({
                 success: true,
+                role: user.role,
                 message: "Login berhasil!",
                 token: token
             });

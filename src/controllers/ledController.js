@@ -95,6 +95,7 @@ export const ledController = {
             return res.status(200).json({
                 success: true,
                 data: {
+                    faseAktif: gameState.faseAktif || 'idle',
                     babakAktif: babakAktif,
                     soalAktif: dataSoal,
                     sisaWaktuDetik: sisaWaktu,

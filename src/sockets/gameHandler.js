@@ -5,7 +5,7 @@ let sisaWaktu = 0;
 let soalAktifId = null;
 let paketAktifId = null;
 let isPaused = false;
-let faseAktif = 'idle'; 
+let faseAktif = 'idle';
 
 // FASE STRATEGI 
 export const mulaiFaseStrategi = async (io, paketId) => {
@@ -212,7 +212,7 @@ export const getGameState = () => {
         sisaWaktu,
         soalAktifId,
         paketAktifId,
-        faseAktif 
+        faseAktif
     };
 };
 
@@ -355,3 +355,74 @@ async function prosesEliminasiOtomatis(io, soalId) {
         console.error("[ERROR ELIMINASI]:", error);
     }
 }
+
+export const gameSocketHandler = (io) => {
+
+    // ── 1. AUTHENTICATION MIDDLEWARE ──
+    io.use((socket, next) => {
+        // Ambil token dari handshake auth (Frontend harus mengirim ini saat inisialisasi socket)
+        const token = socket.handshake.auth?.token;
+
+        if (!token) {
+            console.log("❌ Klien mencoba connect tanpa token.");
+            return next(new Error("Token tidak ada"));
+        }
+
+        try {
+            // Verifikasi token (Pastikan nama variabel .env sesuai dengan yang Anda pakai di login)
+            const decoded = jwt.verify(
+                token,
+                process.env.JWT_SECRET || 'rahasia_cerdas_cermat_2026'
+            );
+
+            // Simpan data user ke dalam object socket untuk dipakai nanti
+            socket.user = decoded;
+            next();
+        } catch (err) {
+            console.log("❌ Token socket tidak valid.");
+            next(new Error("Token tidak valid"));
+        }
+    });
+
+    // ── 2. SAAT CLIENT BERHASIL TERHUBUNG ──
+    io.on('connection', (socket) => {
+        const role = socket.user?.role;
+        const username = socket.user?.username || 'Unknown';
+
+        console.log(`⚡ Klien terhubung: [${socket.id}] | Role: ${role} | User: ${username}`);
+
+        // ── 3. JOIN ROOM BERDASARKAN ROLE ──
+        if (role === 'admin') {
+            socket.join('admin');
+        } else if (role === 'peserta') {
+            socket.join('peserta');
+
+            // ── 4. SINKRONISASI STATE JIKA PESERTA BARU CONNECT / RECONNECT ──
+            // Ini menjawab "Masalah 2" dari FE: Event terlewat jika terlambat connect.
+            const state = getGameState();
+
+            if (state.faseAktif === 'soal' && state.soalAktifId) {
+                // Jika game sedang jalan, langsung kirim event 'game_mulai' eksklusif ke dia
+                socket.emit('game_mulai', {
+                    soalId: state.soalAktifId,
+                    sisaWaktu: state.sisaWaktu
+                });
+            } else if (state.faseAktif === 'strategi' && state.paketAktifId) {
+                // Jika sedang strategi, kirim event strategi
+                socket.emit('fase_strategi_mulai', {
+                    paketId: state.paketAktifId,
+                    sisaWaktu: state.sisaWaktu
+                });
+            } else if (state.faseAktif === 'jeda') {
+                socket.emit('jeda_mulai', { sisaWaktu: state.sisaWaktu });
+            }
+        } else {
+            // Layar LED biasanya tidak punya token khusus, atau Anda buat token dengan role 'led'
+            socket.join('led');
+        }
+
+        socket.on('disconnect', () => {
+            console.log(`🔌 Klien terputus: [${socket.id}] | User: ${username}`);
+        });
+    });
+};
