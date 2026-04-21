@@ -331,4 +331,74 @@ export const adminController = {
             return res.status(500).json({ success: false, error: error.message });
         }
     },
+
+    getScoreboardSemiFinal: async (req, res) => {
+        try {
+            const { paketId } = req.params;
+
+            const teams = await prisma.tim.findMany({
+                where: { tahapAktif: 'semi_final', isEliminated: false, role: 'peserta' },
+                include: { skorBabak: { where: { babak: 'semi_final' } } }
+            });
+
+            let soalFilter = {};
+            if (paketId && paketId !== 'all') {
+                soalFilter = { paketSoalId: parseInt(paketId) };
+            } else {
+                const semiFinalPakets = await prisma.paketSoal.findMany({ where: { babak: 'semi_final' } });
+                soalFilter = { paketSoalId: { in: semiFinalPakets.map(p => p.id) } };
+            }
+
+            const soalList = await prisma.soal.findMany({
+                where: soalFilter,
+                orderBy: { id: 'asc' },
+                select: { id: true }
+            });
+            const soalIds = soalList.map(s => s.id);
+
+            const scoreboardData = await Promise.all(teams.map(async (tim) => {
+                const skor = tim.skorBabak[0]?.poin || 0;
+
+                const taruhan = await prisma.taruhanSoal.findMany({
+                    where: { timId: tim.id, soalId: { in: soalIds } }
+                });
+
+                const riwayat = await prisma.riwayatJawaban.findMany({
+                    where: { timId: tim.id, soalId: { in: soalIds } }
+                });
+
+                const daftarSoal = soalList.map((soal, index) => {
+                    const dataTaruhan = taruhan.find(x => x.soalId === soal.id);
+                    const dataRiwayat = riwayat.find(x => x.soalId === soal.id);
+
+                    let status = 'BELUM';
+                    if (dataRiwayat) {
+                        status = dataRiwayat.isBenar ? 'BENAR' : 'SALAH';
+                    }
+
+                    return {
+                        nomorSoal: index + 1,        
+                        soalId: soal.id,
+                        poinTaruhan: dataTaruhan ? dataTaruhan.poin : 0,
+                        status: status
+                    };
+                });
+
+                return {
+                    id: tim.id,
+                    nama: tim.nama,
+                    totalPoin: skor,
+                    daftarSoal: daftarSoal
+                };
+            }));
+
+            scoreboardData.sort((a, b) => b.totalPoin - a.totalPoin);
+
+            return res.status(200).json({ success: true, data: scoreboardData });
+
+        } catch (error) {
+            console.error("Error Get Scoreboard Semi Final:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 };

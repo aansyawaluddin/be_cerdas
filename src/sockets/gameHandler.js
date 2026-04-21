@@ -6,11 +6,9 @@ let sisaWaktu = 0;
 let soalAktifId = null;
 let paketAktifId = null;
 let isPaused = false;
-let faseAktif = 'idle'; // PENANDA FASE: idle | strategi | soal | jeda
+let faseAktif = 'idle';
 
-// ==========================================
-// 1. FASE STRATEGI (INPUT TARUHAN SEMI FINAL)
-// ==========================================
+
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180;
@@ -45,9 +43,6 @@ export const mulaiFaseStrategi = async (io, paketId) => {
     }
 };
 
-// ==========================================
-// 2. FASE JEDA ISTIRAHAT (ANTAR GAME)
-// ==========================================
 export const mulaiJedaIstirahat = (io, currentPaketId) => {
     const DURASI_JEDA = parseInt(process.env.DURASI_JEDA) || 180;
 
@@ -72,7 +67,6 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
             console.log(`[GAME] Waktu Istirahat Habis.`);
 
             try {
-                // MENCARI PAKET GAME SELANJUTNYA
                 const paketSelanjutnya = await prisma.paketSoal.findFirst({
                     where: {
                         babak: 'semi_final',
@@ -97,9 +91,7 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
     }, 1000);
 };
 
-// ==========================================
-// 3. SIKLUS SOAL OTOMATIS (GAME BERJALAN)
-// ==========================================
+
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
@@ -124,7 +116,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
             if (infoPaket && infoPaket.babak === 'semi_final') {
                 io.emit('paket_selesai', { message: "Game selesai! Memasuki waktu istirahat." });
-                // JIKA SOAL HABIS (GAME SELESAI) -> MASUK FASE JEDA
                 mulaiJedaIstirahat(io, paketId);
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
@@ -177,9 +168,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
     }
 };
 
-// ==========================================
-// 4. FITUR PAUSE & FORCE STOP
-// ==========================================
 export const togglePause = (io) => {
     if (!soalAktifId && !paketAktifId) {
         throw new Error("Tidak ada game yang sedang berjalan.");
@@ -207,9 +195,7 @@ export const forceStopTimer = () => {
     faseAktif = 'idle';
 };
 
-// ==========================================
-// 5. EXPOSE GAME STATE
-// ==========================================
+
 export const getGameState = () => {
     return {
         isPaused,
@@ -220,16 +206,12 @@ export const getGameState = () => {
     };
 };
 
-// ==========================================
-// 6. HANDLER KONEKSI DASAR SOCKET.IO (DENGAN AUTH)
-// ==========================================
+
 export const gameSocketHandler = (io) => {
 
-    // MIDDLEWARE AUTHENTICATION
     io.use((socket, next) => {
         const token = socket.handshake.auth?.token;
 
-        // BYPASS UNTUK LAYAR LED
         if (!token) {
             console.log("⚠️ Klien tanpa token terhubung. Otomatis masuk sebagai Layar LED.");
             socket.user = { role: 'led', username: 'Layar Panggung' };
@@ -237,14 +219,17 @@ export const gameSocketHandler = (io) => {
         }
 
         try {
-            const decoded = jwt.verify(
-                token,
-                process.env.JWT_SECRET || 'rahasia_cerdas_cermat_2026'
-            );
+            if (!process.env.JWT_SECRET) {
+                console.error("CRITICAL ERROR: JWT_SECRET tidak ditemukan di file .env!");
+                return next(new Error("Server Configuration Error"));
+            }
+
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
             socket.user = decoded;
             next();
         } catch (err) {
-            console.log("❌ Token socket tidak valid.");
+            console.log("❌ Token socket tidak valid atau sudah expired.");
             next(new Error("Token tidak valid"));
         }
     });
@@ -255,7 +240,6 @@ export const gameSocketHandler = (io) => {
 
         console.log(`⚡ Klien terhubung: [${socket.id}] | Role: ${role} | User: ${username}`);
 
-        // JOIN ROOM & SINKRONISASI STATE RECONNECT
         if (role === 'admin') {
             socket.join('admin');
         } else if (role === 'peserta') {
@@ -286,9 +270,7 @@ export const gameSocketHandler = (io) => {
     });
 };
 
-// ==========================================
-// 7. LOGIKA ELIMINASI OTOMATIS
-// ==========================================
+
 async function prosesEliminasiOtomatis(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({
@@ -301,9 +283,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
         const paketSoalId = soal.paketSoalId;
         const babakSekarang = soal.paketSoal.babak;
 
-        // --------------------------------------------------------
-        // LOGIKA ELIMINASI SEMI FINAL (KHUSUS DI AKHIR GAME 5)
-        // --------------------------------------------------------
+
         if (babakSekarang === 'semi_final') {
             const soalSisa = await prisma.soal.count({
                 where: { paketSoalId: paketSoalId, status: 'belum' }
@@ -312,7 +292,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 where: { babak: 'semi_final', id: { gt: paketSoalId } }
             });
 
-            // Eksekusi HANYA JIKA ini soal terakhir dari paket terakhir
             if (soalSisa === 0 && !paketBerikutnya) {
                 console.log(`[GAME] Rangkaian Semi Final Berakhir. Mengeksekusi Eliminasi 6 Tim Terbawah...`);
 
@@ -321,7 +300,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     include: { skorBabak: true }
                 });
 
-                // Urutkan dari poin TERKECIL ke TERBESAR
                 const klasemenAkhir = daftarTimSemiFinal.map(tim => {
                     const skor = tim.skorBabak.find(s => s.babak === 'semi_final');
                     return {
@@ -331,7 +309,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     };
                 }).sort((a, b) => a.poin - b.poin);
 
-                // Ambil 6 tim terbawah
                 const timGugur = klasemenAkhir.slice(0, 6);
 
                 for (const tim of timGugur) {
@@ -352,9 +329,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
             return;
         }
 
-        // --------------------------------------------------------
-        // LOGIKA ELIMINASI PENYISIHAN (TIDAK DIUBAH SAMA SEKALI)
-        // --------------------------------------------------------
         if (babakSekarang === 'penyisihan') {
             const jumlahSelesai = await prisma.soal.count({
                 where: { paketSoalId: paketSoalId, status: 'selesai' }
