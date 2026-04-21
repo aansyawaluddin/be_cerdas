@@ -334,7 +334,7 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 where: { paketSoalId: paketSoalId, status: 'selesai' }
             });
 
-            const titikEliminasi = [10, 15, 20, 25, 28, 31, 34, 37, 40];
+            const titikEliminasi = [10, 15, 20, 25, 30, 35];
 
             if (!titikEliminasi.includes(jumlahSelesai)) return;
 

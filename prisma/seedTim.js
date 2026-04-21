@@ -4,12 +4,12 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🏃 Memulai seeding 48 Tim Peserta...');
+    console.log('🏃 Memulai seeding 24 Tim Peserta...');
 
     const commonPassword = await bcrypt.hash('123', 10);
     const teamsData = [];
 
-    for (let i = 1; i <= 48; i++) {
+    for (let i = 1; i <= 24; i++) {
         const grupId = Math.floor((i - 1) / 12) + 1;
         const order = String(i).padStart(2, '0');
 
@@ -29,8 +29,8 @@ async function main() {
         skipDuplicates: true,
     });
 
-    console.log('✅ 48 Tim berhasil didaftarkan ke Database.');
-    console.log('📊 Distribusi: 12 Tim per Grup (Grup 1-4).');
+    console.log('✅ 24 Tim berhasil didaftarkan ke Database.');
+    console.log('📊 Distribusi: 12 Tim per Grup (Grup 1 dan Grup 2).');
 }
 
 main()

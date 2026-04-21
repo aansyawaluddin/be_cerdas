@@ -10,7 +10,7 @@ async function main() {
 
     console.log('✨ Database bersih! Memulai seeding Bank Soal baru...');
 
-    const namaPakets = ['Paket A', 'Paket B', 'Paket C', 'Paket D'];
+    const namaPakets = ['Paket A', 'Paket B'];
     const daftarKategori = ['b_indo', 'b_inggris', 'mtk', 'ipa'];
 
     for (let p = 0; p < namaPakets.length; p++) {
@@ -48,7 +48,7 @@ async function main() {
                 tipe: tipeSoal,
                 opsiJawaban: opsiJawaban,
                 jawabanBenar: jawabanBenar,
-                poin: 25, 
+                poin: 25,
                 status: 'belum',
                 waktuMulai: null,
                 paketSoalId: paket.id
@@ -61,7 +61,7 @@ async function main() {
     }
 
     console.log('🎉 Seeding Soal Selesai!');
-    console.log('📊 Total: 4 Paket Soal (Isi tiap paket: 20 PG, 20 Esai).');
+    console.log('📊 Total: 2 Paket Soal (Isi tiap paket: 20 PG, 20 Esai).');
 }
 
 main()
