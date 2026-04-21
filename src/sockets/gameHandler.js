@@ -342,8 +342,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
             const namaPaket = soal.paketSoal.nama.toLowerCase();
             if (namaPaket.includes('a')) grupAktif = 1;
             else if (namaPaket.includes('b')) grupAktif = 2;
-            else if (namaPaket.includes('c')) grupAktif = 3;
-            else if (namaPaket.includes('d')) grupAktif = 4;
 
             if (grupAktif === null) return;
 
