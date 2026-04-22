@@ -42,12 +42,28 @@ export const ledController = {
                 dataSoal = {
                     id: soalAktif.id,
                     pertanyaan: soalAktif.pertanyaan,
+                    foto: soalAktif.foto,
                     kategori: soalAktif.kategori,
                     tipe: soalAktif.tipe,
                     opsiJawaban: soalAktif.opsiJawaban,
                     paketNama: soalAktif.paketSoal.nama,
                     babak: soalAktif.paketSoal.babak
                 };
+
+                if (soalAktif.tipe === 'memori') {
+                    if (gameState.faseAktif === 'memori_gambar') {
+                        dataSoal.pertanyaan = "Silakan amati gambar berikut dengan saksama!";
+                        dataSoal.opsiJawaban = null;
+                    }
+                    else if (gameState.faseAktif === 'memori_jeda') {
+                        dataSoal.foto = null;
+                        dataSoal.pertanyaan = "Bersiaplah...";
+                        dataSoal.opsiJawaban = null;
+                    }
+                    else if (gameState.faseAktif === 'soal') {
+                        dataSoal.foto = null;
+                    }
+                }
             }
 
             if (babakAktif) {
@@ -57,8 +73,6 @@ export const ledController = {
                     const namaP = paketNama.toLowerCase();
                     if (namaP.includes('a')) targetGrup = 1;
                     else if (namaP.includes('b')) targetGrup = 2;
-                    else if (namaP.includes('c')) targetGrup = 3;
-                    else if (namaP.includes('d')) targetGrup = 4;
                 }
 
                 const filterTim = {
@@ -113,9 +127,11 @@ export const ledController = {
 
     getGlobalLeaderboard: async (req, res) => {
         try {
+            const { babak, grup } = req.query;
             const gameState = getGameState();
-            let targetBabak = 'penyisihan';
-            let targetGrup = null;
+
+            let targetBabak = babak || 'penyisihan';
+            let targetGrup = grup ? parseInt(grup) : null;
 
             if (gameState.paketAktifId) {
                 const paket = await prisma.paketSoal.findUnique({
@@ -131,6 +147,17 @@ export const ledController = {
                         else if (namaP.includes('b')) targetGrup = 2;
                     }
                 }
+            }
+
+            if (targetBabak === 'penyisihan' && targetGrup === null) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Game penyisihan belum dimulai. Menunggu Admin memilih paket.",
+                    data: {
+                        podium: [],
+                        urutanLainnya: []
+                    }
+                });
             }
 
             const filter = {

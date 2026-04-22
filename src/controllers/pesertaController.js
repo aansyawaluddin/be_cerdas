@@ -64,7 +64,16 @@ export const pesertaController = {
 
             const soalAktif = await prisma.soal.findFirst({
                 where: { status: 'aktif' },
-                select: { id: true, pertanyaan: true, kategori: true, tipe: true, opsiJawaban: true, waktuMulai: true, poin: true }
+                select: {
+                    id: true,
+                    pertanyaan: true,
+                    foto: true,
+                    kategori: true,
+                    tipe: true,
+                    opsiJawaban: true,
+                    waktuMulai: true,
+                    poin: true
+                }
             });
 
             if (!soalAktif) return res.status(404).json({ success: false, message: "Belum ada soal dimulai." });
@@ -80,9 +89,26 @@ export const pesertaController = {
                 sisaWaktu = Math.max(0, DURASI - Math.floor((new Date().getTime() - soalAktif.waktuMulai?.getTime()) / 1000));
             }
 
+            let dataSoalAman = { ...soalAktif };
+
+            if (soalAktif.tipe === 'memori') {
+                if (gameState.faseAktif === 'memori_gambar') {
+                    dataSoalAman.pertanyaan = "Amati gambar berikut dengan saksama!";
+                    dataSoalAman.opsiJawaban = null;
+                }
+                else if (gameState.faseAktif === 'memori_jeda') {
+                    dataSoalAman.foto = null;
+                    dataSoalAman.pertanyaan = "Waktu habis! Bersiaplah, pertanyaan akan segera muncul...";
+                    dataSoalAman.opsiJawaban = null;
+                }
+                else if (gameState.faseAktif === 'soal') {
+                    dataSoalAman.foto = null;
+                }
+            }
+
             return res.status(200).json({
                 success: true,
-                data: soalAktif,
+                data: dataSoalAman,
                 sisaWaktuDetik: sisaWaktu,
                 isPaused: gameState.isPaused,
                 sudahMenjawab: !!riwayat,
@@ -132,7 +158,6 @@ export const pesertaController = {
 
             const gameState = getGameState();
 
-            // 👇 MENCEGAH JAWAB SAAT GAMBAR/JEDA DITAMPILKAN
             if (gameState.faseAktif === 'memori_gambar' || gameState.faseAktif === 'memori_jeda') {
                 return res.status(403).json({
                     success: false,

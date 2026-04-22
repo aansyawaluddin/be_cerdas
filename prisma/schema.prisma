@@ -75,6 +75,7 @@ model PaketSoal {
 
 model Soal {
   id            Int        @id @default(autoincrement())
+  foto          String?
   pertanyaan    String     @db.Text
   
   kategori      KategoriSoal
