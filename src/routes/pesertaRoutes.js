@@ -1,6 +1,6 @@
 import express from 'express';
 import { pesertaController } from '../controllers/pesertaController.js';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, isPeserta } from '../middleware/auth.js';
 
 const router = express.Router();
 

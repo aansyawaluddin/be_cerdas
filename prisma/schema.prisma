@@ -22,6 +22,7 @@ enum KategoriSoal {
 enum TipeSoal {
   pilihan_ganda
   esai
+  memori
 }
 
 enum Babak {

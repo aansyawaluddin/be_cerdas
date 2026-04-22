@@ -86,7 +86,7 @@ export const pesertaController = {
                 sisaWaktuDetik: sisaWaktu,
                 isPaused: gameState.isPaused,
                 sudahMenjawab: !!riwayat,
-                timPencetBelId: gameState.timPencetBelId // Kirim ID yang lagi pegang bel
+                timPencetBelId: gameState.timPencetBelId
             });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
