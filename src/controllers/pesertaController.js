@@ -8,17 +8,10 @@ export const pesertaController = {
             const gameState = getGameState();
 
             if (gameState.faseAktif !== 'strategi') {
-                return res.status(403).json({
-                    success: false,
-                    message: "Akses ditolak! Saat ini bukan sesi penyusunan strategi."
-                });
+                return res.status(403).json({ success: false, message: "Akses ditolak! Saat ini bukan sesi penyusunan strategi." });
             }
-
             if (parseInt(paketId) !== parseInt(gameState.paketAktifId)) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Akses ditolak! Anda mencoba mengakses paket soal yang salah."
-                });
+                return res.status(403).json({ success: false, message: "Akses ditolak! Anda mencoba mengakses paket soal yang salah." });
             }
 
             const soalStrategi = await prisma.soal.findMany({
@@ -27,12 +20,7 @@ export const pesertaController = {
                 orderBy: { id: 'asc' }
             });
 
-            return res.status(200).json({
-                success: true,
-                sisaWaktuDetik: gameState.sisaWaktu,
-                data: soalStrategi
-            });
-
+            return res.status(200).json({ success: true, sisaWaktuDetik: gameState.sisaWaktu, data: soalStrategi });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
@@ -44,46 +32,20 @@ export const pesertaController = {
             const { daftarTaruhan } = req.body;
             const gameState = getGameState();
 
-            if (gameState.faseAktif !== 'strategi') {
-                return res.status(403).json({
-                    success: false,
-                    message: "Akses ditolak! Saat ini bukan sesi waktu untuk menyusun strategi taruhan."
-                });
-            }
-
-            if (gameState.isPaused) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Tahan! Game sedang di-jeda (Paused)."
-                });
-            }
-
-            if (!Array.isArray(daftarTaruhan) || daftarTaruhan.length !== 10) {
-                return res.status(400).json({ success: false, message: "Harus memasukkan taruhan untuk tepat 10 soal!" });
-            }
+            if (gameState.faseAktif !== 'strategi') return res.status(403).json({ success: false, message: "Bukan waktu menyusun strategi." });
+            if (gameState.isPaused) return res.status(403).json({ success: false, message: "Game sedang di-jeda (Paused)." });
+            if (!Array.isArray(daftarTaruhan) || daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus tepat 10 soal!" });
 
             let totalPoin = 0;
             for (const taruhan of daftarTaruhan) {
-                if (taruhan.poin < 10 || taruhan.poin > 100) {
-                    return res.status(400).json({ success: false, message: "Poin tiap soal harus 10 - 100!" });
-                }
+                if (taruhan.poin < 10 || taruhan.poin > 100) return res.status(400).json({ success: false, message: "Poin harus 10-100!" });
                 totalPoin += taruhan.poin;
             }
+            if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin melebihi 200!" });
 
-            if (totalPoin > 200) {
-                return res.status(400).json({ success: false, message: `Total poin melebihi 200! (Total: ${totalPoin})` });
-            }
-
-            const dataInsert = daftarTaruhan.map(t => ({
-                timId: timId,
-                soalId: t.soalId,
-                poin: t.poin
-            }));
-
+            const dataInsert = daftarTaruhan.map(t => ({ timId: timId, soalId: t.soalId, poin: t.poin }));
             await prisma.$transaction([
-                prisma.taruhanSoal.deleteMany({
-                    where: { timId: timId, soalId: { in: daftarTaruhan.map(t => t.soalId) } }
-                }),
+                prisma.taruhanSoal.deleteMany({ where: { timId: timId, soalId: { in: daftarTaruhan.map(t => t.soalId) } } }),
                 prisma.taruhanSoal.createMany({ data: dataInsert })
             ]);
 
@@ -98,24 +60,16 @@ export const pesertaController = {
             const timId = req.user.id;
             const tim = await prisma.tim.findUnique({ where: { id: timId } });
 
-            if (tim.isEliminated) {
-                return res.status(403).json({ success: false, message: "Tim tereliminasi.", isEliminated: true });
-            }
+            if (tim.isEliminated) return res.status(403).json({ success: false, message: "Tim tereliminasi.", isEliminated: true });
 
             const soalAktif = await prisma.soal.findFirst({
                 where: { status: 'aktif' },
-                select: {
-                    id: true, pertanyaan: true, kategori: true, tipe: true,
-                    opsiJawaban: true, waktuMulai: true, poin: true
-                }
+                select: { id: true, pertanyaan: true, kategori: true, tipe: true, opsiJawaban: true, waktuMulai: true, poin: true }
             });
 
             if (!soalAktif) return res.status(404).json({ success: false, message: "Belum ada soal dimulai." });
 
-            const riwayat = await prisma.riwayatJawaban.findFirst({
-                where: { timId: timId, soalId: soalAktif.id }
-            });
-
+            const riwayat = await prisma.riwayatJawaban.findFirst({ where: { timId: timId, soalId: soalAktif.id } });
             let sisaWaktu = 0;
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
@@ -132,8 +86,34 @@ export const pesertaController = {
                 sisaWaktuDetik: sisaWaktu,
                 isPaused: gameState.isPaused,
                 sudahMenjawab: !!riwayat,
+                timPencetBelId: gameState.timPencetBelId // Kirim ID yang lagi pegang bel
             });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 
+    tekanBel: async (req, res) => {
+        try {
+            const timId = req.user.id;
+            const io = req.app.get('io');
+            const gameState = getGameState();
+
+            if (gameState.faseAktif !== 'soal' || !gameState.soalAktifId) {
+                return res.status(400).json({ success: false, message: "Bukan waktunya memencet bel!" });
+            }
+            if (gameState.isPaused) {
+                return res.status(403).json({ success: false, message: "Game sedang di-pause!" });
+            }
+
+            const { prosesTekanBel } = await import('../sockets/gameHandler.js');
+            const berhasil = prosesTekanBel(io, timId);
+
+            if (berhasil) {
+                return res.status(200).json({ success: true, message: "Berhasil! Silakan pilih jawaban." });
+            } else {
+                return res.status(400).json({ success: false, message: "Kalah cepat! Tim lain sudah memencet bel." });
+            }
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
@@ -159,14 +139,8 @@ export const pesertaController = {
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
-            if (gameState.isPaused) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Tahan! Game sedang di-jeda (Paused). Anda tidak bisa mengirim jawaban saat ini."
-                });
-            }
+            if (gameState.isPaused) return res.status(403).json({ success: false, message: "Tahan! Game sedang di-jeda." });
 
-            // MENGHITUNG DURASI MURNI
             if (gameState.soalAktifId === soal.id) {
                 if (gameState.sisaWaktu <= 0) return res.status(400).json({ success: false, message: "Waktu habis." });
                 durasiDetik = DURASI - gameState.sisaWaktu;
@@ -178,30 +152,28 @@ export const pesertaController = {
             const isBenar = jawabanTim.toString().trim().toLowerCase() === soal.jawabanBenar.trim().toLowerCase();
             let poinDidapat = 0;
 
-            // LOGIKA PENYISIHAN
             if (tim.tahapAktif === 'penyisihan') {
                 if (isBenar) {
-                    const jumlahBenarSebelumnya = await prisma.riwayatJawaban.count({
-                        where: {
-                            soalId: soal.id,
-                            isBenar: true
-                        }
-                    });
+                    const jumlahBenarSebelumnya = await prisma.riwayatJawaban.count({ where: { soalId: soal.id, isBenar: true } });
                     const poinPeringkat = [25, 23, 21, 19, 17, 14, 12, 10, 8, 6, 4, 2];
                     poinDidapat = poinPeringkat[jumlahBenarSebelumnya] || 0;
-                } else {
-                    poinDidapat = 0;
                 }
             }
-
-            // LOGIKA SEMI FINAL
             else if (tim.tahapAktif === 'semi_final') {
                 if (soal.paketSoal.nama.toLowerCase().includes("rebutan")) {
+                    // 👇 ATURAN WAJIB PENCET BEL
+                    if (gameState.timPencetBelId !== tim.id) {
+                        return res.status(403).json({ success: false, message: "Hanya pemegang bel yang bisa menjawab!" });
+                    }
+
                     poinDidapat = isBenar ? 20 : 0;
+
+                    // 👇 APAPUN HASILNYA, SOAL LANGSUNG DITUTUP PAKSA
+                    const { selesaikanSoalSekarang } = await import('../sockets/gameHandler.js');
+                    selesaikanSoalSekarang(req.app.get('io'), soal.paketSoalId);
+
                 } else {
-                    const taruhan = await prisma.taruhanSoal.findUnique({
-                        where: { timId_soalId: { timId: tim.id, soalId: soal.id } }
-                    });
+                    const taruhan = await prisma.taruhanSoal.findUnique({ where: { timId_soalId: { timId: tim.id, soalId: soal.id } } });
                     const nilaiTaruhan = taruhan ? taruhan.poin : 10;
                     poinDidapat = isBenar ? nilaiTaruhan : -nilaiTaruhan;
                 }
@@ -209,10 +181,7 @@ export const pesertaController = {
 
             await prisma.$transaction(async (tx) => {
                 await tx.riwayatJawaban.create({
-                    data: {
-                        timId: timId, soalId: soal.id, jawabanTim: jawabanTim.toString(),
-                        isBenar: isBenar, poinDidapat: poinDidapat
-                    }
+                    data: { timId: timId, soalId: soal.id, jawabanTim: jawabanTim.toString(), isBenar: isBenar, poinDidapat: poinDidapat }
                 });
                 await tx.skorBabak.upsert({
                     where: { timId_babak: { timId: timId, babak: tim.tahapAktif } },

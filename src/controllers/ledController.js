@@ -100,6 +100,7 @@ export const ledController = {
                     soalAktif: dataSoal,
                     sisaWaktuDetik: sisaWaktu,
                     isPaused: gameState.isPaused,
+                    timPencetBelId: gameState.timPencetBelId,
                     timBertanding: daftarTim
                 }
             });

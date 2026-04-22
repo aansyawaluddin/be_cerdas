@@ -12,4 +12,6 @@ router.post('/submit-strategi', verifyToken, pesertaController.submitStrategi);
 router.get('/soal-aktif', verifyToken, pesertaController.getSoalAktif);
 router.post('/submit-jawaban', verifyToken, pesertaController.submitJawaban);
 
+router.post('/tekan-bel', verifyToken, isPeserta, pesertaController.tekanBel);
+
 export default router;
