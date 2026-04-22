@@ -68,11 +68,13 @@ export const ledController = {
                 let targetGrup = null;
                 if (babakAktif === 'penyisihan' && paketNama) {
                     const namaP = paketNama.toLowerCase();
-                    if (namaP.includes('a')) targetGrup = 1;
-                    else if (namaP.includes('b')) targetGrup = 2;
+                    if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
+                    else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
+                    else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
+                    else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
                 }
 
-                const filterTim = { role: 'peserta', isEliminated: false, tahapAktif: babakAktif };
+                const filterTim = { role: 'peserta', tahapAktif: babakAktif };
                 if (targetGrup !== null) filterTim.grup = targetGrup;
 
                 const teams = await prisma.tim.findMany({
@@ -84,8 +86,12 @@ export const ledController = {
                     const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
                     const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
                     return {
-                        id: tim.id, nama: tim.nama, fotoTim: tim.fotoTim, poin: skor ? skor.poin : 0,
-                        statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU'
+                        id: tim.id,
+                        nama: tim.nama,
+                        fotoTim: tim.fotoTim,
+                        poin: skor ? skor.poin : 0,
+                        statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU',
+                        isEliminated: tim.isEliminated
                     };
                 }).sort((a, b) => b.poin - a.poin);
             }
@@ -112,7 +118,7 @@ export const ledController = {
         try {
             const { babak, grup } = req.query;
             const gameState = getGameState();
-            
+
             let targetBabak = babak || 'penyisihan';
             let targetGrup = grup ? parseInt(grup) : null;
 
@@ -122,8 +128,10 @@ export const ledController = {
                     targetBabak = paket.babak;
                     const namaP = paket.nama.toLowerCase();
                     if (targetBabak === 'penyisihan') {
-                        if (namaP.includes('a')) targetGrup = 1;
-                        else if (namaP.includes('b')) targetGrup = 2;
+                        if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
+                        else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
+                        else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
+                        else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
                     }
                 }
             }
@@ -135,14 +143,20 @@ export const ledController = {
                 });
             }
 
-            const filter = { role: 'peserta', isEliminated: false, tahapAktif: targetBabak };
+            const filter = { role: 'peserta', tahapAktif: targetBabak };
             if (targetGrup !== null) filter.grup = targetGrup;
 
             const daftarTim = await prisma.tim.findMany({ where: filter, include: { skorBabak: true } });
 
             const leaderboard = daftarTim.map(tim => {
                 const skorAktif = tim.skorBabak.find(s => s.babak === targetBabak);
-                return { id: tim.id, nama: tim.nama, fotoTim: tim.fotoTim, totalPoin: skorAktif ? skorAktif.poin : 0 };
+                return {
+                    id: tim.id,
+                    nama: tim.nama,
+                    fotoTim: tim.fotoTim,
+                    totalPoin: skorAktif ? skorAktif.poin : 0,
+                    isEliminated: tim.isEliminated
+                };
             }).sort((a, b) => b.totalPoin - a.totalPoin);
 
             return res.status(200).json({

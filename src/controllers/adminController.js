@@ -93,8 +93,14 @@ export const adminController = {
             if (!io) return res.status(500).json({ message: "Socket belum siap." });
 
             const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+            if (!paket) return res.status(404).json({ message: "Paket tidak ditemukan." });
 
-            if (paket.babak === 'semi_final' && !paket.nama.toLowerCase().includes('rebutan')) {
+            const namaPaket = paket.nama.toLowerCase();
+
+            const isSemiFinalStrategi = paket.babak === 'semi_final' && !namaPaket.includes('rebutan');
+            const isFinalStrategi = paket.babak === 'final' && (namaPaket.includes('game 2') || namaPaket.includes('score battle'));
+
+            if (isSemiFinalStrategi || isFinalStrategi) {
                 await mulaiFaseStrategi(io, paketId);
                 return res.status(200).json({ message: "Fase Strategi 3 Menit dimulai!" });
             } else {
