@@ -136,6 +136,81 @@ export const adminController = {
         }
     },
 
+
+    inisialisasiFinal: async (req, res) => {
+        try {
+            const timLolos = await prisma.tim.findMany({
+                where: { tahapAktif: 'semi_final', isEliminated: false, role: 'peserta' },
+                include: { skorBabak: { where: { babak: 'semi_final' } } }
+            });
+
+            const klasemen = timLolos.map(tim => {
+                const skor = tim.skorBabak.length > 0 ? tim.skorBabak[0].poin : 0;
+                return { ...tim, totalPoin: skor };
+            }).sort((a, b) => b.totalPoin - a.totalPoin);
+
+            const top6 = klasemen.slice(0, 6);
+
+            if (top6.length === 0) {
+                return res.status(404).json({ success: false, message: "Tidak ada tim yang bisa dipromosikan ke Final." });
+            }
+
+            await prisma.$transaction(async (tx) => {
+                for (const tim of top6) {
+                    await tx.tim.update({ where: { id: tim.id }, data: { tahapAktif: 'final' } });
+
+                    await tx.skorBabak.upsert({
+                        where: { timId_babak: { timId: tim.id, babak: 'final' } },
+                        update: { poin: 1000 },
+                        create: { timId: tim.id, babak: 'final', poin: 1000 }
+                    });
+                }
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: `Luar Biasa! ${top6.length} tim melaju ke Grand Final dengan modal 1000 poin.`,
+                data: top6.map(t => ({ id: t.id, nama: t.nama }))
+            });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
+    // API Khusus Game 4 (Juri Input)
+    inputNilaiJuri: async (req, res) => {
+        try {
+            const { timId, nilai } = req.body; // nilai = 1 sampai 100
+
+            if (!timId || nilai === undefined) return res.status(400).json({ success: false, message: "Data tidak lengkap!" });
+            if (nilai < 1 || nilai > 100) return res.status(400).json({ success: false, message: "Nilai juri harus 1 - 100." });
+
+            const tim = await prisma.tim.findUnique({ where: { id: parseInt(timId) } });
+            if (!tim || tim.tahapAktif !== 'final') return res.status(400).json({ success: false, message: "Tim tidak valid atau bukan finalis." });
+
+            await prisma.skorBabak.update({
+                where: { timId_babak: { timId: tim.id, babak: 'final' } },
+                data: { poin: { increment: parseInt(nilai) } }
+            });
+
+            // Update Layar LED secara Realtime
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('update_layar_led', {
+                    timId: tim.id,
+                    namaSekolah: tim.nama,
+                    status: 'NILAI JURI',
+                    poinTambahan: parseInt(nilai),
+                    waktuDetik: 0
+                });
+            }
+
+            return res.status(200).json({ success: true, message: `Berhasil menambahkan ${nilai} poin ke tim ${tim.nama}.` });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
     togglePauseGame: async (req, res) => {
         try {
             const io = req.app.get('io');
