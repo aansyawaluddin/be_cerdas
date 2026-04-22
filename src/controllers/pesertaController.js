@@ -198,16 +198,25 @@ export const pesertaController = {
 
             const tim = await prisma.tim.findUnique({ where: { id: timId } });
             const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(gameState.paketAktifId) } });
-            if (paket && paket.babak === 'penyisihan') {
-                const namaPaket = paket.nama.toLowerCase();
-                let targetGrup = null;
-                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-                else if (/\b(c|3)\b/.test(namaPaket)) targetGrup = 3;
-                else if (/\b(d|4)\b/.test(namaPaket)) targetGrup = 4;
 
-                if (targetGrup !== null && tim.grup !== targetGrup) {
-                    return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
+            if (paket) {
+                const namaPaket = paket.nama.toLowerCase();
+
+                if (paket.babak === 'penyisihan') {
+                    let targetGrup = null;
+                    if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
+                    else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
+
+                    if (targetGrup !== null && tim.grup !== targetGrup) {
+                        return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
+                    }
+                }
+
+                if (paket.babak === 'semi_final' && !namaPaket.includes('rebutan')) {
+                    return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
+                }
+                if (paket.babak === 'final' && (namaPaket.includes('game 2') || namaPaket.includes('score battle'))) {
+                    return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
                 }
             }
 

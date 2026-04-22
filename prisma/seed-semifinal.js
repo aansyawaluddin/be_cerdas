@@ -6,36 +6,29 @@ async function main() {
     console.log("⏳ Memulai proses seeding data Semi Final...");
 
     const daftarPaket = [
-        "Semi Final - Game 1",
-        "Semi Final - Game 2",
-        "Semi Final - Game 3",
-        "Semi Final - Game 4",
-        "Semi Final - Game 5",
-        "Semi Final - Rebutan"
+        { nama: "Semi Final", jumlah: 50 },
+        { nama: "Semi Final - Rebutan", jumlah: 5 }
     ];
 
     for (let i = 0; i < daftarPaket.length; i++) {
-        const namaPaket = daftarPaket[i];
+        const item = daftarPaket[i];
 
         const paket = await prisma.paketSoal.create({
             data: {
-                nama: namaPaket,
+                nama: item.nama,
                 babak: 'semi_final',
             }
         });
 
         console.log(`✅ Paket dibuat: [ID: ${paket.id}] ${paket.nama}`);
 
-        const jumlahSoal = namaPaket.includes("Rebutan") ? 15 : 10;
         const dataSoal = [];
 
-        for (let j = 1; j <= jumlahSoal; j++) {
+        for (let j = 1; j <= item.jumlah; j++) {
             dataSoal.push({
                 paketSoalId: paket.id,
-                pertanyaan: `[${namaPaket.toUpperCase()}] Ini adalah pertanyaan testing nomor ${j}. Manakah jawaban yang paling tepat?`,
-
+                pertanyaan: `[${paket.nama.toUpperCase()}] Ini adalah pertanyaan nomor ${j}. Manakah jawaban yang paling tepat?`,
                 kategori: "b_indo",
-
                 tipe: "pilihan_ganda",
                 opsiJawaban: [
                     "Jawaban Benar",
@@ -53,10 +46,10 @@ async function main() {
             data: dataSoal
         });
 
-        console.log(`   -> Berhasil memasukkan ${jumlahSoal} soal ke dalam ${paket.nama}`);
+        console.log(`   -> Berhasil memasukkan ${item.jumlah} soal ke dalam ${paket.nama}`);
     }
 
-    console.log("\n🎉 Seeding Semi Final selesai! Database siap digunakan untuk simulasi.");
+    console.log("\n🎉 Seeding Semi Final selesai! Database siap digunakan.");
 }
 
 main()
