@@ -30,6 +30,7 @@ export const mulaiFaseStrategi = async (io, paketId) => {
                 console.log(`[GAME] Waktu Strategi Habis. Bersiap masuk ke Soal 1...`);
                 io.emit('fase_strategi_selesai', { message: 'Waktu habis! Mempersiapkan soal...' });
 
+                // Dari strategi ke Soal 1 biarkan otomatis (jeda 5 detik persiapan)
                 setTimeout(() => {
                     mulaiSiklusPaket(io, paketId);
                 }, 5000);
@@ -172,7 +173,9 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
                                     io.emit('waktu_habis', { soalId: soalAktifId });
                                     await prosesEliminasiOtomatis(io, soalAktifId);
-                                    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
+
+                                    // 👇 Pindah Otomatis Dihapus! Game Berhenti Menunggu Admin Klik Next.
+                                    console.log(`[GAME] Waktu habis. Menunggu tindakan Admin...`);
                                 }
                             }, 1000);
                         }
@@ -180,9 +183,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                 }
             }, 1000);
 
-        }
-
-        else {
+        } else {
             faseAktif = 'soal';
             sisaWaktu = DURASI;
             io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
@@ -199,7 +200,9 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
                     io.emit('waktu_habis', { soalId: soalAktifId });
                     await prosesEliminasiOtomatis(io, soalAktifId);
-                    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
+
+                    // 👇 Pindah Otomatis Dihapus! Game Berhenti Menunggu Admin Klik Next.
+                    console.log(`[GAME] Waktu habis. Menunggu tindakan Admin...`);
                 }
             }, 1000);
         }
@@ -216,9 +219,9 @@ export const selesaikanSoalSekarang = async (io, paketId) => {
     if (soalAktifId) {
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
         io.emit('waktu_habis', { soalId: soalAktifId });
-        console.log(`[GAME] Soal ID ${soalAktifId} ditutup paksa karena sudah dijawab di babak rebutan.`);
+        console.log(`[GAME] Soal ID ${soalAktifId} ditutup karena sudah dijawab di babak rebutan. Menunggu Admin...`);
     }
-    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
+    // 👇 Pindah Otomatis Setelah Tim Salah Jawab Dihapus!
 };
 
 export const prosesTekanBel = (io, timId) => {
@@ -258,6 +261,59 @@ export const getGameState = () => {
         faseAktif,
         timPencetBelId
     };
+};
+
+export const lanjutSoalBerikutnya = async (io) => {
+    if (!paketAktifId) throw new Error("Tidak ada paket soal yang aktif saat ini.");
+
+    // 1. Ambil info paket & status soal saat ini
+    const paket = await prisma.paketSoal.findUnique({
+        where: { id: parseInt(paketAktifId) }
+    });
+
+    const soalSekarang = soalAktifId ? await prisma.soal.findUnique({ where: { id: soalAktifId } }) : null;
+
+    // 2. KONDISI: Jika Admin menekan Next tapi soal masih berstatus "aktif" (timer masih jalan)
+    if (soalSekarang && soalSekarang.status === 'aktif') {
+
+        // Cek syarat penolakan (Hanya berlaku untuk NON-REBUTAN)
+        // Kalau game rebutan, Admin boleh next kapan saja (misal gak ada yg mencet bel)
+        if (!paket.nama.toLowerCase().includes('rebutan')) {
+            const totalJawabanMasuk = await prisma.riwayatJawaban.count({
+                where: { soalId: soalAktifId }
+            });
+
+            let filterTim = { role: 'peserta', tahapAktif: paket.babak, isEliminated: false };
+            if (paket.babak === 'penyisihan') {
+                const namaP = paket.nama.toLowerCase();
+                if (namaP.includes('a')) filterTim.grup = 1;
+                else if (namaP.includes('b')) filterTim.grup = 2;
+                else if (namaP.includes('c')) filterTim.grup = 3;
+                else if (namaP.includes('d')) filterTim.grup = 4;
+            }
+            const totalPesertaSeharusnya = await prisma.tim.count({ where: filterTim });
+
+            // Tolak pindah soal jika belum semua menjawab
+            if (totalJawabanMasuk < totalPesertaSeharusnya) {
+                throw new Error(`Sabar! Baru ${totalJawabanMasuk} dari ${totalPesertaSeharusnya} tim yang menjawab.`);
+            }
+        }
+
+        // Lolos validasi (atau ini game rebutan): Hentikan timer & tutup soal
+        if (timerInterval) clearInterval(timerInterval);
+        console.log(`[GAME] Timer dihentikan paksa oleh Admin.`);
+
+        await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+        io.emit('waktu_habis', { soalId: soalAktifId });
+        await prosesEliminasiOtomatis(io, soalAktifId);
+    }
+
+    // 3. JIKA SOAL SUDAH SELESAI (Waktu sudah habis / Tim salah di rebutan / Paksa ditutup)
+    // Maka langsung panggil fungsi soal baru tanpa menunggu timer.
+    console.log(`[GAME] Admin mengonfirmasi lanjut ke soal berikutnya...`);
+    mulaiSiklusPaket(io, paketAktifId);
+
+    return true;
 };
 
 export const gameSocketHandler = (io) => {
@@ -341,6 +397,8 @@ async function prosesEliminasiOtomatis(io, soalId) {
             const namaPaket = soal.paketSoal.nama.toLowerCase();
             if (namaPaket.includes('a')) grupAktif = 1;
             else if (namaPaket.includes('b')) grupAktif = 2;
+            else if (namaPaket.includes('c')) grupAktif = 3;
+            else if (namaPaket.includes('d')) grupAktif = 4;
 
             if (grupAktif === null) return;
 

@@ -24,4 +24,6 @@ router.post('/paket/:paketId/reset', verifyToken, isAdmin, adminController.reset
 
 router.post('/inisialisasi-semi-final', adminController.inisialisasiSemiFinal);
 
+router.post('/next-soal', adminController.nextSoal);
+
 export default router;

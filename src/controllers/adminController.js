@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { mulaiSiklusPaket, mulaiFaseStrategi, togglePause, forceStopTimer, getGameState } from '../sockets/gameHandler.js';
+import { mulaiSiklusPaket, mulaiFaseStrategi, togglePause, forceStopTimer, getGameState, lanjutSoalBerikutnya } from '../sockets/gameHandler.js';
 import prisma from '../utils/prisma.js';
 
 export const adminController = {
@@ -7,46 +7,24 @@ export const adminController = {
     createTim: async (req, res) => {
         try {
             const { nama, grup } = req.body;
-
-            if (!nama) {
-                return res.status(400).json({ success: false, message: "Nama tim wajib diisi!" });
-            }
+            if (!nama) return res.status(400).json({ success: false, message: "Nama tim wajib diisi!" });
 
             const username = nama.toLowerCase().replace(/[^a-z0-9]/g, '');
-
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash("123", salt);
-
             const fotoTim = req.file ? req.file.filename : null;
 
             const newTim = await prisma.tim.create({
-                data: {
-                    nama: nama,
-                    username: username,
-                    password: hashedPassword,
-                    fotoTim: fotoTim,
-                    grup: grup ? parseInt(grup) : 1,
-                    role: 'peserta'
-                }
+                data: { nama, username, password: hashedPassword, fotoTim, grup: grup ? parseInt(grup) : 1, role: 'peserta' }
             });
 
             return res.status(201).json({
                 success: true,
                 message: "Tim berhasil didaftarkan!",
-                data: {
-                    id: newTim.id,
-                    nama: newTim.nama,
-                    username: newTim.username,
-                    grup: newTim.grup,
-                    fotoTim: newTim.fotoTim
-                }
+                data: { id: newTim.id, nama: newTim.nama, username: newTim.username, grup: newTim.grup, fotoTim: newTim.fotoTim }
             });
-
         } catch (error) {
-            console.error("Error create tim:", error);
-            if (error.code === 'P2002' && error.meta.target.includes('username')) {
-                return res.status(400).json({ success: false, message: "Terjadi bentrok username, silakan coba submit lagi." });
-            }
+            if (error.code === 'P2002') return res.status(400).json({ success: false, message: "Terjadi bentrok username." });
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -70,11 +48,7 @@ export const adminController = {
             const soal = await prisma.soal.findMany({
                 where: { paketSoalId: parseInt(paketId) },
                 orderBy: { id: 'asc' },
-                select: {
-                    id: true,
-                    pertanyaan: true,
-                    tipe: true,
-                }
+                select: { id: true, pertanyaan: true, tipe: true }
             });
             return res.status(200).json({ success: true, data: soal });
         } catch (error) {
@@ -87,18 +61,9 @@ export const adminController = {
             const { id } = req.params;
             const soal = await prisma.soal.findUnique({
                 where: { id: parseInt(id) },
-                select: {
-                    id: true,
-                    pertanyaan: true,
-                    kategori: true,
-                    tipe: true,
-                    opsiJawaban: true,
-                    jawabanBenar: true,
-                }
+                select: { id: true, pertanyaan: true, foto: true, kategori: true, tipe: true, opsiJawaban: true, jawabanBenar: true }
             });
-            if (!soal) {
-                return res.status(404).json({ success: false, message: "Soal tidak ditemukan" });
-            }
+            if (!soal) return res.status(404).json({ success: false, message: "Soal tidak ditemukan" });
             return res.status(200).json({ success: true, data: soal });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -112,14 +77,7 @@ export const adminController = {
 
             const updatedSoal = await prisma.soal.update({
                 where: { id: parseInt(id) },
-                data: {
-                    pertanyaan,
-                    kategori,
-                    tipe,
-                    opsiJawaban,
-                    jawabanBenar,
-                    ...(poin && { poin: parseInt(poin) })
-                }
+                data: { pertanyaan, kategori, tipe, opsiJawaban, jawabanBenar, ...(poin && { poin: parseInt(poin) }) }
             });
 
             return res.status(200).json({ success: true, message: "Soal berhasil diperbarui", data: updatedSoal });
@@ -137,15 +95,12 @@ export const adminController = {
             const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
 
             if (paket.babak === 'semi_final' && !paket.nama.toLowerCase().includes('rebutan')) {
-
                 await mulaiFaseStrategi(io, paketId);
                 return res.status(200).json({ message: "Fase Strategi 3 Menit dimulai!" });
-
             } else {
                 const soalDimulai = await mulaiSiklusPaket(io, paketId);
                 return res.status(200).json({ message: "Game menyala! Menampilkan soal." });
             }
-
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
@@ -158,18 +113,11 @@ export const adminController = {
             });
 
             if (timLolos.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Tidak ada tim dari penyisihan yang bisa dipromosikan."
-                });
+                return res.status(404).json({ success: false, message: "Tidak ada tim dari penyisihan yang bisa dipromosikan." });
             }
             await prisma.$transaction(async (tx) => {
                 for (const tim of timLolos) {
-                    await tx.tim.update({
-                        where: { id: tim.id },
-                        data: { tahapAktif: 'semi_final' }
-                    });
-
+                    await tx.tim.update({ where: { id: tim.id }, data: { tahapAktif: 'semi_final' } });
                     await tx.skorBabak.upsert({
                         where: { timId_babak: { timId: tim.id, babak: 'semi_final' } },
                         update: { poin: 1000 },
@@ -180,12 +128,10 @@ export const adminController = {
 
             return res.status(200).json({
                 success: true,
-                message: `Mantap! ${timLolos.length} tim berhasil naik kelas ke Semi Final dengan modal awal 1000 poin.`,
+                message: `Mantap! ${timLolos.length} tim berhasil naik kelas ke Semi Final.`,
                 data: timLolos.map(t => ({ id: t.id, nama: t.nama }))
             });
-
         } catch (error) {
-            console.error("Error Inisialisasi Semi Final:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -194,9 +140,7 @@ export const adminController = {
         try {
             const io = req.app.get('io');
             if (!io) return res.status(500).json({ message: "Socket belum siap." });
-
             const status = togglePause(io);
-
             return res.status(200).json({
                 success: true,
                 message: status.isPaused ? "Game berhasil di-PAUSE!" : "Game kembali DILANJUTKAN!",
@@ -210,29 +154,14 @@ export const adminController = {
     resetPaketTesting: async (req, res) => {
         try {
             const { paketId } = req.params;
-
             forceStopTimer();
 
-            const paket = await prisma.paketSoal.findUnique({
-                where: { id: parseInt(paketId) }
-            });
+            const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+            if (!paket) return res.status(404).json({ success: false, message: "Paket tidak ditemukan!" });
 
-            if (!paket) {
-                return res.status(404).json({ success: false, message: "Paket tidak ditemukan!" });
-            }
-
-            await prisma.soal.updateMany({
-                where: { paketSoalId: parseInt(paketId) },
-                data: { status: 'belum', waktuMulai: null }
-            });
-
-            await prisma.riwayatJawaban.deleteMany({
-                where: { soal: { paketSoalId: parseInt(paketId) } }
-            });
-
-            await prisma.skorBabak.deleteMany({
-                where: { babak: paket.babak }
-            });
+            await prisma.soal.updateMany({ where: { paketSoalId: parseInt(paketId) }, data: { status: 'belum', waktuMulai: null } });
+            await prisma.riwayatJawaban.deleteMany({ where: { soal: { paketSoalId: parseInt(paketId) } } });
+            await prisma.skorBabak.deleteMany({ where: { babak: paket.babak } });
 
             if (paket.babak === 'penyisihan') {
                 await prisma.tim.updateMany({
@@ -244,90 +173,53 @@ export const adminController = {
             const io = req.app.get('io');
             if (io) io.emit('game_reset', { message: "Game telah di-reset oleh Admin." });
 
-            return res.status(200).json({
-                success: true,
-                message: `Paket Soal ID ${paketId}, riwayat jawaban, poin babak, dan status eliminasi berhasil di-reset menjadi nol!`
-            });
+            return res.status(200).json({ success: true, message: `Paket Soal ID ${paketId} berhasil di-reset!` });
         } catch (error) {
-            console.error("Error Reset Paket:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
 
     getDashboardLive: async (req, res) => {
         try {
-            const soalAktif = await prisma.soal.findFirst({
-                where: { status: 'aktif' },
-                include: { paketSoal: true }
-            });
-
-            let sisaWaktu = 0;
-            let targetBabak = 'penyisihan';
-            let targetGrup = null;
-
+            const soalAktif = await prisma.soal.findFirst({ where: { status: 'aktif' }, include: { paketSoal: true } });
+            let sisaWaktu = 0, targetBabak = 'penyisihan', targetGrup = null;
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
-
                 if (gameState.soalAktifId === soalAktif.id) {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
                     sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
-
                 if (targetBabak === 'penyisihan') {
                     const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
                     if (namaPaket.includes('a')) targetGrup = 1;
                     else if (namaPaket.includes('b')) targetGrup = 2;
-                    else if (namaPaket.includes('c')) targetGrup = 3;
-                    else if (namaPaket.includes('d')) targetGrup = 4;
                 }
             }
 
-            const aturanPencarian = {
-                role: 'peserta',
-                isEliminated: false,
-                tahapAktif: targetBabak
-            };
+            const aturanPencarian = { role: 'peserta', isEliminated: false, tahapAktif: targetBabak };
+            if (targetGrup !== null) aturanPencarian.grup = targetGrup;
 
-            if (targetGrup !== null) {
-                aturanPencarian.grup = targetGrup;
-            }
-
-            const daftarTim = await prisma.tim.findMany({
-                where: aturanPencarian,
-                include: { skorBabak: true }
-            });
+            const daftarTim = await prisma.tim.findMany({ where: aturanPencarian, include: { skorBabak: true } });
 
             const leaderboard = daftarTim.map(tim => {
                 const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
-                return {
-                    id: tim.id,
-                    nama: tim.nama,
-                    poin: skor ? skor.poin : 0
-                };
+                return { id: tim.id, nama: tim.nama, poin: skor ? skor.poin : 0 };
             }).sort((a, b) => b.poin - a.poin);
 
             return res.status(200).json({
                 success: true,
                 data: {
-                    soalAktif: soalAktif ? {
-                        id: soalAktif.id,
-                        pertanyaan: soalAktif.pertanyaan,
-                        kategori: soalAktif.kategori,
-                        paketNama: soalAktif.paketSoal.nama,
-                        jawabanBenar: soalAktif.jawabanBenar
-                    } : null,
+                    soalAktif: soalAktif ? { id: soalAktif.id, pertanyaan: soalAktif.pertanyaan, kategori: soalAktif.kategori, paketNama: soalAktif.paketSoal.nama, jawabanBenar: soalAktif.jawabanBenar } : null,
                     sisaWaktuDetik: sisaWaktu,
                     leaderboard: leaderboard
                 }
             });
-
         } catch (error) {
-            console.error("Error Get Dashboard Live:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -335,7 +227,6 @@ export const adminController = {
     getScoreboardSemiFinal: async (req, res) => {
         try {
             const { paketId } = req.params;
-
             const teams = await prisma.tim.findMany({
                 where: { tahapAktif: 'semi_final', isEliminated: false, role: 'peserta' },
                 include: { skorBabak: { where: { babak: 'semi_final' } } }
@@ -349,56 +240,41 @@ export const adminController = {
                 soalFilter = { paketSoalId: { in: semiFinalPakets.map(p => p.id) } };
             }
 
-            const soalList = await prisma.soal.findMany({
-                where: soalFilter,
-                orderBy: { id: 'asc' },
-                select: { id: true }
-            });
+            const soalList = await prisma.soal.findMany({ where: soalFilter, orderBy: { id: 'asc' }, select: { id: true } });
             const soalIds = soalList.map(s => s.id);
 
             const scoreboardData = await Promise.all(teams.map(async (tim) => {
                 const skor = tim.skorBabak[0]?.poin || 0;
-
-                const taruhan = await prisma.taruhanSoal.findMany({
-                    where: { timId: tim.id, soalId: { in: soalIds } }
-                });
-
-                const riwayat = await prisma.riwayatJawaban.findMany({
-                    where: { timId: tim.id, soalId: { in: soalIds } }
-                });
+                const taruhan = await prisma.taruhanSoal.findMany({ where: { timId: tim.id, soalId: { in: soalIds } } });
+                const riwayat = await prisma.riwayatJawaban.findMany({ where: { timId: tim.id, soalId: { in: soalIds } } });
 
                 const daftarSoal = soalList.map((soal, index) => {
                     const dataTaruhan = taruhan.find(x => x.soalId === soal.id);
                     const dataRiwayat = riwayat.find(x => x.soalId === soal.id);
-
                     let status = 'BELUM';
-                    if (dataRiwayat) {
-                        status = dataRiwayat.isBenar ? 'BENAR' : 'SALAH';
-                    }
+                    if (dataRiwayat) status = dataRiwayat.isBenar ? 'BENAR' : 'SALAH';
 
-                    return {
-                        nomorSoal: index + 1,        
-                        soalId: soal.id,
-                        poinTaruhan: dataTaruhan ? dataTaruhan.poin : 0,
-                        status: status
-                    };
+                    return { nomorSoal: index + 1, soalId: soal.id, poinTaruhan: dataTaruhan ? dataTaruhan.poin : 0, status: status };
                 });
-
-                return {
-                    id: tim.id,
-                    nama: tim.nama,
-                    totalPoin: skor,
-                    daftarSoal: daftarSoal
-                };
+                return { id: tim.id, nama: tim.nama, totalPoin: skor, daftarSoal: daftarSoal };
             }));
 
             scoreboardData.sort((a, b) => b.totalPoin - a.totalPoin);
-
             return res.status(200).json({ success: true, data: scoreboardData });
-
         } catch (error) {
-            console.error("Error Get Scoreboard Semi Final:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
+
+    nextSoal: async (req, res) => {
+        try {
+            const io = req.app.get('io');
+            if (!io) return res.status(500).json({ success: false, message: "Socket belum siap." });
+
+            await lanjutSoalBerikutnya(io);
+            return res.status(200).json({ success: true, message: "Memuat soal berikutnya..." });
+        } catch (error) {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+    }
 };
