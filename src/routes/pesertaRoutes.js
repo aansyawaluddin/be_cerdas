@@ -4,6 +4,8 @@ import { verifyToken, isPeserta } from '../middleware/auth.js';
 
 const router = express.Router();
 
+router.get('/info', verifyToken, pesertaController.getInformasiTim);
+
 // Form Fase Strategi
 router.get('/strategi/:paketId', verifyToken, pesertaController.getSoalStrategi);
 router.post('/submit-strategi', verifyToken, pesertaController.submitStrategi);

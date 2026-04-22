@@ -2,6 +2,40 @@ import prisma from '../utils/prisma.js';
 import { getGameState } from '../sockets/gameHandler.js';
 
 export const pesertaController = {
+
+    getInformasiTim: async (req, res) => {
+        try {
+            const timId = req.user.id;
+
+            const tim = await prisma.tim.findUnique({
+                where: { id: timId },
+                select: {
+                    fotoTim: true,
+                    nama: true,
+                    grup: true,
+                    tahapAktif: true 
+                }
+            });
+
+            if (!tim) {
+                return res.status(404).json({ success: false, message: "Tim tidak ditemukan!" });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    nama: tim.nama,
+                    grup: tim.grup,
+                    foto: tim.fotoTim,
+                    tahap: tim.tahapAktif
+                }
+            });
+
+        } catch (error) {
+            console.error("Error Get Informasi Tim:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
     getSoalStrategi: async (req, res) => {
         try {
             const { paketId } = req.params;
