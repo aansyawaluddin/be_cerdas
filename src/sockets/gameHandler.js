@@ -67,10 +67,9 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
                 });
 
                 if (paketSelanjutnya) {
-                    console.log(`[GAME] Jeda Selesai. Masuk otomatis ke Fase Strategi Paket: ${paketSelanjutnya.id}`);
-                    io.emit('jeda_selesai', { message: "Istirahat selesai! Memasuki Fase Strategi Game selanjutnya." });
+                    console.log(`[GAME] Jeda Selesai. Masuk ke Paket: ${paketSelanjutnya.id}`);
+                    io.emit('jeda_selesai', { message: "Istirahat selesai! Memasuki Game selanjutnya." });
 
-                    // CEK JIKA INI GAME REBUTAN (TIDAK PERLU STRATEGI)
                     if (paketSelanjutnya.nama.toLowerCase().includes('rebutan')) {
                         mulaiSiklusPaket(io, paketSelanjutnya.id);
                     } else {
@@ -90,9 +89,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
     try {
         const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
         paketAktifId = paketId;
-        faseAktif = 'soal';
         isPaused = false;
-
         timPencetBelId = null;
 
         await prisma.soal.updateMany({
@@ -124,29 +121,88 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         });
 
         soalAktifId = soalAktif.id;
-        sisaWaktu = DURASI;
 
-        io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
-        console.log(`[GAME] Menjalankan Soal ID: ${soalAktifId}`);
+        if (soalAktif.tipe === 'memori') {
+            console.log(`[GAME] Memulai Soal MEMORI ID: ${soalAktifId}`);
 
-        if (timerInterval) clearInterval(timerInterval);
+            faseAktif = 'memori_gambar';
+            sisaWaktu = 30; // 30 Detik tampil gambar
+            io.emit('memori_gambar_mulai', { soalId: soalAktifId, sisaWaktu });
 
-        timerInterval = setInterval(async () => {
-            if (isPaused) return;
-            sisaWaktu--;
-            io.emit('timer_update', { sisaWaktu });
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(async () => {
+                if (isPaused) return;
+                sisaWaktu--;
+                io.emit('timer_update', { sisaWaktu, fase: 'memori_gambar' });
 
-            if (sisaWaktu <= 0) {
-                clearInterval(timerInterval);
-                await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
-                io.emit('waktu_habis', { soalId: soalAktifId });
-                console.log(`[GAME] Waktu Habis untuk Soal ID: ${soalAktifId}`);
+                if (sisaWaktu <= 0) {
+                    clearInterval(timerInterval);
 
-                await prosesEliminasiOtomatis(io, soalAktifId);
+                    faseAktif = 'memori_jeda';
+                    sisaWaktu = 5;
+                    io.emit('memori_jeda_mulai', { soalId: soalAktifId, sisaWaktu });
+                    console.log(`[GAME] Jeda Memori (5s) sebelum pertanyaan muncul...`);
 
-                setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
-            }
-        }, 1000);
+                    timerInterval = setInterval(async () => {
+                        if (isPaused) return;
+                        sisaWaktu--;
+                        io.emit('timer_update', { sisaWaktu, fase: 'memori_jeda' });
+
+                        if (sisaWaktu <= 0) {
+                            clearInterval(timerInterval);
+
+                            faseAktif = 'soal';
+                            sisaWaktu = DURASI;
+
+                            await prisma.soal.update({
+                                where: { id: soalAktifId },
+                                data: { waktuMulai: new Date() }
+                            });
+
+                            io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
+                            console.log(`[GAME] Pertanyaan Memori Muncul!`);
+
+                            timerInterval = setInterval(async () => {
+                                if (isPaused) return;
+                                sisaWaktu--;
+                                io.emit('timer_update', { sisaWaktu, fase: 'soal' });
+
+                                if (sisaWaktu <= 0) {
+                                    clearInterval(timerInterval);
+                                    await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+                                    io.emit('waktu_habis', { soalId: soalAktifId });
+                                    await prosesEliminasiOtomatis(io, soalAktifId);
+                                    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
+                                }
+                            }, 1000);
+                        }
+                    }, 1000);
+                }
+            }, 1000);
+
+        }
+
+        else {
+            faseAktif = 'soal';
+            sisaWaktu = DURASI;
+            io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
+            console.log(`[GAME] Menjalankan Soal Normal ID: ${soalAktifId}`);
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(async () => {
+                if (isPaused) return;
+                sisaWaktu--;
+                io.emit('timer_update', { sisaWaktu, fase: 'soal' });
+
+                if (sisaWaktu <= 0) {
+                    clearInterval(timerInterval);
+                    await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+                    io.emit('waktu_habis', { soalId: soalAktifId });
+                    await prosesEliminasiOtomatis(io, soalAktifId);
+                    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
+                }
+            }, 1000);
+        }
 
         return soalAktif;
     } catch (error) {
@@ -157,23 +213,18 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
 export const selesaikanSoalSekarang = async (io, paketId) => {
     if (timerInterval) clearInterval(timerInterval);
-
     if (soalAktifId) {
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
         io.emit('waktu_habis', { soalId: soalAktifId });
         console.log(`[GAME] Soal ID ${soalAktifId} ditutup paksa karena sudah dijawab di babak rebutan.`);
     }
-
-    // Pindah otomatis setelah 5 detik
-    setTimeout(() => {
-        mulaiSiklusPaket(io, paketId);
-    }, 5000);
+    setTimeout(() => { mulaiSiklusPaket(io, paketId); }, 5000);
 };
 
 export const prosesTekanBel = (io, timId) => {
-    if (timPencetBelId) return false; 
+    if (timPencetBelId) return false;
     timPencetBelId = timId;
-    io.emit('bel_ditekan', { timId: timId }); 
+    io.emit('bel_ditekan', { timId: timId });
     return true;
 };
 
@@ -232,8 +283,13 @@ export const gameSocketHandler = (io) => {
         else if (role === 'peserta') {
             socket.join('peserta');
             const state = getGameState();
+
             if (state.faseAktif === 'soal' && state.soalAktifId) {
                 socket.emit('game_mulai', { soalId: state.soalAktifId, sisaWaktu: state.sisaWaktu });
+            } else if (state.faseAktif === 'memori_gambar' && state.soalAktifId) {
+                socket.emit('memori_gambar_mulai', { soalId: state.soalAktifId, sisaWaktu: state.sisaWaktu });
+            } else if (state.faseAktif === 'memori_jeda' && state.soalAktifId) {
+                socket.emit('memori_jeda_mulai', { soalId: state.soalAktifId, sisaWaktu: state.sisaWaktu });
             } else if (state.faseAktif === 'strategi' && state.paketAktifId) {
                 socket.emit('fase_strategi_mulai', { paketId: state.paketAktifId, sisaWaktu: state.sisaWaktu });
             } else if (state.faseAktif === 'jeda') {

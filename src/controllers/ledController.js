@@ -143,7 +143,6 @@ export const ledController = {
                 filter.grup = targetGrup;
             }
 
-            // 3. Ambil data tim beserta skornya
             const daftarTim = await prisma.tim.findMany({
                 where: filter,
                 include: { skorBabak: true }

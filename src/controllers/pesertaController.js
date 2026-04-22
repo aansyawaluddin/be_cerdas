@@ -77,7 +77,7 @@ export const pesertaController = {
             if (gameState.soalAktifId === soalAktif.id) {
                 sisaWaktu = gameState.sisaWaktu;
             } else {
-                sisaWaktu = Math.max(0, DURASI - Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000));
+                sisaWaktu = Math.max(0, DURASI - Math.floor((new Date().getTime() - soalAktif.waktuMulai?.getTime()) / 1000));
             }
 
             return res.status(200).json({
@@ -86,7 +86,8 @@ export const pesertaController = {
                 sisaWaktuDetik: sisaWaktu,
                 isPaused: gameState.isPaused,
                 sudahMenjawab: !!riwayat,
-                timPencetBelId: gameState.timPencetBelId
+                timPencetBelId: gameState.timPencetBelId,
+                faseAktif: gameState.faseAktif
             });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -129,6 +130,16 @@ export const pesertaController = {
             const tim = await prisma.tim.findUnique({ where: { id: timId } });
             if (tim.isEliminated) return res.status(403).json({ success: false, message: "Tim tereliminasi." });
 
+            const gameState = getGameState();
+
+            // 👇 MENCEGAH JAWAB SAAT GAMBAR/JEDA DITAMPILKAN
+            if (gameState.faseAktif === 'memori_gambar' || gameState.faseAktif === 'memori_jeda') {
+                return res.status(403).json({
+                    success: false,
+                    message: "Sabar! Belum waktunya menjawab. Perhatikan soal baik-baik."
+                });
+            }
+
             const soal = await prisma.soal.findUnique({ where: { id: parseInt(soalId) }, include: { paketSoal: true } });
             if (!soal || soal.status !== 'aktif') return res.status(400).json({ success: false, message: "Soal ditutup!" });
 
@@ -136,7 +147,6 @@ export const pesertaController = {
             if (cekRiwayat) return res.status(400).json({ success: false, message: "Anda sudah menjawab!" });
 
             let durasiDetik = 0;
-            const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             if (gameState.isPaused) return res.status(403).json({ success: false, message: "Tahan! Game sedang di-jeda." });
@@ -161,14 +171,12 @@ export const pesertaController = {
             }
             else if (tim.tahapAktif === 'semi_final') {
                 if (soal.paketSoal.nama.toLowerCase().includes("rebutan")) {
-                    // 👇 ATURAN WAJIB PENCET BEL
                     if (gameState.timPencetBelId !== tim.id) {
                         return res.status(403).json({ success: false, message: "Hanya pemegang bel yang bisa menjawab!" });
                     }
 
                     poinDidapat = isBenar ? 20 : 0;
 
-                    // 👇 APAPUN HASILNYA, SOAL LANGSUNG DITUTUP PAKSA
                     const { selesaikanSoalSekarang } = await import('../sockets/gameHandler.js');
                     selesaikanSoalSekarang(req.app.get('io'), soal.paketSoalId);
 
@@ -219,14 +227,14 @@ export const pesertaController = {
                 where: {
                     role: 'peserta',
                     tahapAktif: timSaya.tahapAktif,
-                    grup: timSaya.grup 
+                    grup: timSaya.grup
                 },
                 select: {
                     id: true,
                     nama: true,
                     grup: true,
                     fotoTim: true,
-                    isEliminated: true, 
+                    isEliminated: true,
                     skorBabak: {
                         where: { babak: timSaya.tahapAktif },
                         select: { poin: true }
@@ -242,7 +250,7 @@ export const pesertaController = {
                     namaSekolah: tim.nama,
                     foto: tim.fotoTim,
                     totalPoin: poinSaatIni,
-                    isEliminated: tim.isEliminated, 
+                    isEliminated: tim.isEliminated,
                     isMe: tim.id === timId
                 };
             });
@@ -264,5 +272,5 @@ export const pesertaController = {
             console.error("Error Get Leaderboard Tahap:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
-    },
+    }
 };
