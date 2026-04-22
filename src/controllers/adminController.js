@@ -289,7 +289,7 @@ export const adminController = {
             return res.status(200).json({
                 success: true,
                 data: {
-                    soalAktif: soalAktif ? { id: soalAktif.id, pertanyaan: soalAktif.pertanyaan, kategori: soalAktif.kategori, paketNama: soalAktif.paketSoal.nama, jawabanBenar: soalAktif.jawabanBenar } : null,
+                    soalAktif: soalAktif ? { id: soalAktif.id, tipe: soalAktif.tipe, pertanyaan: soalAktif.pertanyaan, kategori: soalAktif.kategori, paketNama: soalAktif.paketSoal.nama, jawabanBenar: soalAktif.jawabanBenar } : null,
                     sisaWaktuDetik: sisaWaktu,
                     leaderboard: leaderboard
                 }
