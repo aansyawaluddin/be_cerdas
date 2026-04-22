@@ -261,6 +261,8 @@ export const adminController = {
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
+            let dataSoalAdmin = null;
+
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
                 if (gameState.soalAktifId === soalAktif.id) {
@@ -273,6 +275,33 @@ export const adminController = {
                     const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
                     if (namaPaket.includes('a')) targetGrup = 1;
                     else if (namaPaket.includes('b')) targetGrup = 2;
+                    else if (namaPaket.includes('c')) targetGrup = 3;
+                    else if (namaPaket.includes('d')) targetGrup = 4;
+                }
+
+                // 👇 LOGIKA SENSOR (MASKING) UNTUK DASHBOARD ADMIN
+                dataSoalAdmin = {
+                    id: soalAktif.id,
+                    tipe: soalAktif.tipe,
+                    pertanyaan: soalAktif.pertanyaan,
+                    foto: soalAktif.foto,                // Ditambahkan agar Admin bisa lihat gambar
+                    opsiJawaban: soalAktif.opsiJawaban,  // Ditambahkan agar Admin bisa lihat opsi
+                    kategori: soalAktif.kategori,
+                    paketNama: soalAktif.paketSoal.nama,
+                    jawabanBenar: soalAktif.jawabanBenar
+                };
+
+                if (soalAktif.tipe === 'memori') {
+                    if (gameState.faseAktif === 'memori_gambar') {
+                        dataSoalAdmin.pertanyaan = "Amati gambar berikut dengan saksama!";
+                        dataSoalAdmin.opsiJawaban = null;
+                    } else if (gameState.faseAktif === 'memori_jeda') {
+                        dataSoalAdmin.foto = null;
+                        dataSoalAdmin.pertanyaan = "Waktu habis! Bersiaplah, pertanyaan akan segera muncul...";
+                        dataSoalAdmin.opsiJawaban = null;
+                    } else if (gameState.faseAktif === 'soal') {
+                        dataSoalAdmin.foto = null;
+                    }
                 }
             }
 
@@ -289,8 +318,11 @@ export const adminController = {
             return res.status(200).json({
                 success: true,
                 data: {
-                    soalAktif: soalAktif ? { id: soalAktif.id, tipe: soalAktif.tipe, pertanyaan: soalAktif.pertanyaan, kategori: soalAktif.kategori, paketNama: soalAktif.paketSoal.nama, jawabanBenar: soalAktif.jawabanBenar } : null,
+                    soalAktif: dataSoalAdmin,
                     sisaWaktuDetik: sisaWaktu,
+                    faseAktif: gameState.faseAktif || 'idle',
+                    isPaused: gameState.isPaused,
+                    timPencetBelId: gameState.timPencetBelId,
                     leaderboard: leaderboard
                 }
             });

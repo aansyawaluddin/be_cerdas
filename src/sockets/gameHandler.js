@@ -423,8 +423,15 @@ async function prosesEliminasiOtomatis(io, soalId) {
                 });
                 return { id: tim.id, nama: tim.nama, totalPoin, totalWaktu };
             }).sort((a, b) => {
+                // Kriteria 1: Poin (Kecil = Terbawah / Gugur)
                 if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
-                return b.totalWaktu - a.totalWaktu;
+
+                // Kriteria 2: Kecepatan Waktu (Lama/Besar = Terbawah / Gugur)
+                if (a.totalWaktu !== b.totalWaktu) return b.totalWaktu - a.totalWaktu;
+
+                // Kriteria 3 (BARU): Jika Poin seri (0) dan Waktu seri (0),
+                // maka tim dengan ID terbesar (Tim ke-12) yang ditaruh paling bawah untuk dieliminasi duluan.
+                return b.id - a.id;
             });
 
             const timTerbawah = klasemen[0];
