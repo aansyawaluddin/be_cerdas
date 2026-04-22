@@ -55,12 +55,14 @@ export const pesertaController = {
                     return res.status(403).json({ success: false, message: "Sabar! Ini belum giliran grup Anda." });
                 }
             }
-
+            
             const soalStrategi = await prisma.soal.findMany({
-                where: { paketSoalId: parseInt(paketId) },
+                where: { paketSoalId: parseInt(paketId), status: 'belum' },
                 select: { id: true, kategori: true },
-                orderBy: { id: 'asc' }
+                orderBy: { id: 'asc' },
+                take: 10
             });
+
             return res.status(200).json({ success: true, sisaWaktuDetik: gameState.sisaWaktu, data: soalStrategi });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -95,13 +97,14 @@ export const pesertaController = {
             }
 
             let totalPoin = 0;
+
             if (tim.tahapAktif === 'semi_final') {
-                if (daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus tepat 10 soal!" });
+                if (daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus mengisi nilai untuk tepat 10 soal pada Game ini!" });
                 for (const taruhan of daftarTaruhan) {
                     if (taruhan.poin < 10 || taruhan.poin > 100) return res.status(400).json({ success: false, message: "Poin harus 10-100!" });
                     totalPoin += taruhan.poin;
                 }
-                if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin melebihi batas 200!" });
+                if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin taruhan di Game ini melebihi batas 200!" });
             }
             else if (tim.tahapAktif === 'final') {
                 if (daftarTaruhan.length !== 20) return res.status(400).json({ success: false, message: "Harus tepat 20 soal!" });
