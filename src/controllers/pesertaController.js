@@ -202,5 +202,67 @@ export const pesertaController = {
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
-    }
+    },
+
+    getLeaderboardTahapAktif: async (req, res) => {
+        try {
+            const timId = req.user.id;
+
+            const timSaya = await prisma.tim.findUnique({
+                where: { id: timId },
+                select: { id: true, nama: true, grup: true, tahapAktif: true }
+            });
+
+            if (!timSaya) return res.status(404).json({ success: false, message: "Tim tidak ditemukan" });
+
+            const daftarTim = await prisma.tim.findMany({
+                where: {
+                    role: 'peserta',
+                    tahapAktif: timSaya.tahapAktif,
+                    grup: timSaya.grup 
+                },
+                select: {
+                    id: true,
+                    nama: true,
+                    grup: true,
+                    fotoTim: true,
+                    isEliminated: true, 
+                    skorBabak: {
+                        where: { babak: timSaya.tahapAktif },
+                        select: { poin: true }
+                    }
+                }
+            });
+
+            const timDenganSkor = daftarTim.map(tim => {
+                const poinSaatIni = tim.skorBabak.length > 0 ? tim.skorBabak[0].poin : 0;
+
+                return {
+                    timId: tim.id,
+                    namaSekolah: tim.nama,
+                    foto: tim.fotoTim,
+                    totalPoin: poinSaatIni,
+                    isEliminated: tim.isEliminated, 
+                    isMe: tim.id === timId
+                };
+            });
+
+            timDenganSkor.sort((a, b) => b.totalPoin - a.totalPoin);
+
+            const rankedData = timDenganSkor.map((item, index) => ({
+                rank: index + 1,
+                ...item
+            }));
+
+            return res.status(200).json({
+                success: true,
+                tahap: timSaya.tahapAktif,
+                data: rankedData
+            });
+
+        } catch (error) {
+            console.error("Error Get Leaderboard Tahap:", error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 };

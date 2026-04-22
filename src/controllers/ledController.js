@@ -113,18 +113,45 @@ export const ledController = {
 
     getGlobalLeaderboard: async (req, res) => {
         try {
-            const { babak } = req.query;
+            const gameState = getGameState();
+            let targetBabak = 'penyisihan';
+            let targetGrup = null;
 
-            const filter = { role: 'peserta', isEliminated: false };
-            if (babak) filter.tahapAktif = babak;
+            if (gameState.paketAktifId) {
+                const paket = await prisma.paketSoal.findUnique({
+                    where: { id: parseInt(gameState.paketAktifId) }
+                });
 
+                if (paket) {
+                    targetBabak = paket.babak;
+                    const namaP = paket.nama.toLowerCase();
+
+                    if (targetBabak === 'penyisihan') {
+                        if (namaP.includes('a')) targetGrup = 1;
+                        else if (namaP.includes('b')) targetGrup = 2;
+                    }
+                }
+            }
+
+            const filter = {
+                role: 'peserta',
+                isEliminated: false,
+                tahapAktif: targetBabak
+            };
+
+            if (targetGrup !== null) {
+                filter.grup = targetGrup;
+            }
+
+            // 3. Ambil data tim beserta skornya
             const daftarTim = await prisma.tim.findMany({
                 where: filter,
                 include: { skorBabak: true }
             });
 
             const leaderboard = daftarTim.map(tim => {
-                const totalPoin = tim.skorBabak.reduce((sum, skor) => sum + skor.poin, 0);
+                const skorAktif = tim.skorBabak.find(s => s.babak === targetBabak);
+                const totalPoin = skorAktif ? skorAktif.poin : 0;
 
                 return {
                     id: tim.id,
@@ -134,13 +161,13 @@ export const ledController = {
                 };
             }).sort((a, b) => b.totalPoin - a.totalPoin);
 
-            const top3 = leaderboard.slice(0, 3);
-            const others = leaderboard.slice(3);
+            const top6 = leaderboard.slice(0, 6);
+            const others = leaderboard.slice(6);
 
             return res.status(200).json({
                 success: true,
                 data: {
-                    podium: top3,
+                    podium: top6,
                     urutanLainnya: others
                 }
             });

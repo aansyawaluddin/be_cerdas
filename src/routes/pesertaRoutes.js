@@ -14,4 +14,6 @@ router.post('/submit-jawaban', verifyToken, pesertaController.submitJawaban);
 
 router.post('/tekan-bel', verifyToken, isPeserta, pesertaController.tekanBel);
 
+router.get('/leaderboard', verifyToken, pesertaController.getLeaderboardTahapAktif);
+
 export default router;
