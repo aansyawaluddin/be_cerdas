@@ -161,6 +161,8 @@ export const pesertaController = {
             }
 
             let dataSoalAman = { ...soalAktif };
+            dataSoalAman.paketBabak = soalAktif.paketSoal.babak;
+            dataSoalAman.paketNama = soalAktif.paketSoal.nama;
             delete dataSoalAman.paketSoal;
 
             if (soalAktif.tipe === 'memori') {

@@ -28,5 +28,6 @@ router.post('/next-soal', adminController.nextSoal);
 
 router.post('/inisialisasi-final', adminController.inisialisasiFinal);
 router.post('/input-nilai-juri', adminController.inputNilaiJuri);
+router.post('/nilai-tambahan-semifinal', adminController.inputNilaiTambahanSemiFinal);
 
 export default router;

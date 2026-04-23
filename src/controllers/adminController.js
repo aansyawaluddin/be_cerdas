@@ -217,6 +217,35 @@ export const adminController = {
         }
     },
 
+    inputNilaiTambahanSemiFinal: async (req, res) => {
+        try {
+            const { timId, nilai } = req.body;
+            if (!timId || nilai === undefined) return res.status(400).json({ success: false, message: "Data tidak lengkap!" });
+            const nilaiInt = parseInt(nilai);
+            if (isNaN(nilaiInt)) return res.status(400).json({ success: false, message: "Nilai harus berupa angka." });
+
+            const tim = await prisma.tim.findUnique({ where: { id: parseInt(timId) } });
+            if (!tim || tim.tahapAktif !== 'semi_final') return res.status(400).json({ success: false, message: "Tim tidak valid atau bukan di babak Semi Final." });
+
+            await prisma.skorBabak.update({
+                where: { timId_babak: { timId: tim.id, babak: 'semi_final' } },
+                data: { poin: { increment: nilaiInt } }
+            });
+
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('update_layar_led', {
+                    timId: tim.id, namaSekolah: tim.nama,
+                    status: 'NILAI TAMBAHAN', poinTambahan: nilaiInt, waktuDetik: 0
+                });
+            }
+
+            return res.status(200).json({ success: true, message: `Berhasil menambahkan ${nilaiInt} poin ke tim ${tim.nama}.` });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
     togglePauseGame: async (req, res) => {
         try {
             const io = req.app.get('io');
@@ -388,6 +417,25 @@ export const adminController = {
             return res.status(200).json({ success: true, message: "Memuat soal berikutnya..." });
         } catch (error) {
             return res.status(400).json({ success: false, message: error.message });
+        }
+    },
+
+    // Tutup soal saat ini tanpa menunggu semua tim menjawab (untuk game 3 & 4 final)
+    tutupSoalAktif: async (req, res) => {
+        try {
+            const io = req.app.get('io');
+            if (!io) return res.status(500).json({ success: false, message: "Socket belum siap." });
+
+            const state = getGameState();
+            if (!state.soalAktifId || !state.paketAktifId) {
+                return res.status(400).json({ success: false, message: "Tidak ada soal yang sedang aktif." });
+            }
+
+            const { selesaikanSoalSekarang } = await import('../sockets/gameHandler.js');
+            await selesaikanSoalSekarang(io, state.paketAktifId);
+            return res.status(200).json({ success: true, message: "Soal berhasil ditutup." });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 };
