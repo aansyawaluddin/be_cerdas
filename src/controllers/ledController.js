@@ -47,7 +47,8 @@ export const ledController = {
                     tipe: soalAktif.tipe,
                     opsiJawaban: soalAktif.opsiJawaban,
                     paketNama: soalAktif.paketSoal.nama,
-                    babak: soalAktif.paketSoal.babak
+                    babak: soalAktif.paketSoal.babak,
+                    faseAktif: gameState.faseAktif || 'soal'
                 };
 
                 if (soalAktif.tipe === 'memori') {
@@ -64,37 +65,41 @@ export const ledController = {
                 }
             }
 
-            if (babakAktif) {
-                let targetGrup = null;
-                if (babakAktif === 'penyisihan' && paketNama) {
-                    const namaP = paketNama.toLowerCase();
-                    if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
-                    else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
-                    else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
-                    else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
-                }
-
-                const filterTim = { role: 'peserta', tahapAktif: babakAktif };
-                if (targetGrup !== null) filterTim.grup = targetGrup;
-
-                const teams = await prisma.tim.findMany({
-                    where: filterTim,
-                    include: { skorBabak: true, riwayat: soalAktif ? { where: { soalId: soalAktif.id } } : false }
-                });
-
-                daftarTim = teams.map(tim => {
-                    const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
-                    const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
-                    return {
-                        id: tim.id,
-                        nama: tim.nama,
-                        fotoTim: tim.fotoTim,
-                        poin: skor ? skor.poin : 0,
-                        statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU',
-                        isEliminated: tim.isEliminated
-                    };
-                }).sort((a, b) => b.poin - a.poin);
+            // 👇 BUG FIXED: Deteksi otomatis jika game belum di-"Mulai" oleh Admin
+            if (!babakAktif) {
+                const cekSemi = await prisma.tim.findFirst({ where: { tahapAktif: 'semi_final' } });
+                babakAktif = cekSemi ? 'semi_final' : 'penyisihan';
             }
+
+            let targetGrup = null;
+            if (babakAktif === 'penyisihan' && paketNama) {
+                const namaP = paketNama.toLowerCase();
+                if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
+                else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
+                else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
+                else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
+            }
+
+            const filterTim = { role: 'peserta', tahapAktif: babakAktif };
+            if (targetGrup !== null) filterTim.grup = targetGrup;
+
+            const teams = await prisma.tim.findMany({
+                where: filterTim,
+                include: { skorBabak: true, riwayat: soalAktif ? { where: { soalId: soalAktif.id } } : false }
+            });
+
+            daftarTim = teams.map(tim => {
+                const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
+                const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
+                return {
+                    id: tim.id,
+                    nama: tim.nama,
+                    fotoTim: tim.fotoTim,
+                    poin: skor ? skor.poin : 0,
+                    statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU',
+                    isEliminated: tim.isEliminated
+                };
+            }).sort((a, b) => b.poin - a.poin);
 
             return res.status(200).json({
                 success: true,
@@ -109,7 +114,6 @@ export const ledController = {
                 }
             });
         } catch (error) {
-            console.error("Error Get LED Live Game:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -164,7 +168,6 @@ export const ledController = {
                 data: { podium: leaderboard.slice(0, 6), urutanLainnya: leaderboard.slice(6) }
             });
         } catch (error) {
-            console.error("Error Get LED Leaderboard:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     }

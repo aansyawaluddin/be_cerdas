@@ -2,7 +2,6 @@ import prisma from '../utils/prisma.js';
 import { getGameState } from '../sockets/gameHandler.js';
 
 export const pesertaController = {
-
     getInformasiTim: async (req, res) => {
         try {
             const timId = req.user.id;
@@ -11,21 +10,13 @@ export const pesertaController = {
                 select: { fotoTim: true, nama: true, grup: true, tahapAktif: true }
             });
 
-            if (!tim) {
-                return res.status(404).json({ success: false, message: "Tim tidak ditemukan!" });
-            }
+            if (!tim) return res.status(404).json({ success: false, message: "Tim tidak ditemukan!" });
 
             return res.status(200).json({
                 success: true,
-                data: {
-                    nama: tim.nama,
-                    grup: tim.grup,
-                    foto: tim.fotoTim,
-                    tahap: tim.tahapAktif
-                }
+                data: { nama: tim.nama, grup: tim.grup, foto: tim.fotoTim, tahap: tim.tahapAktif }
             });
         } catch (error) {
-            console.error("Error Get Informasi Tim:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -37,25 +28,14 @@ export const pesertaController = {
             const gameState = getGameState();
 
             if (gameState.faseAktif !== 'strategi') return res.status(403).json({ success: false, message: "Bukan sesi penyusunan strategi." });
-            if (parseInt(paketId) !== parseInt(gameState.paketAktifId)) return res.status(403).json({ success: false, message: "Akses ditolak! Anda mencoba mengakses paket yang salah." });
+            if (parseInt(paketId) !== parseInt(gameState.paketAktifId)) return res.status(403).json({ success: false, message: "Akses ditolak! Paket salah." });
 
             const tim = await prisma.tim.findUnique({ where: { id: timId } });
             const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
 
-            if (!tim || tim.isEliminated) return res.status(403).json({ success: false, message: "Akses ditolak! Tim Anda sudah tereliminasi." });
-            if (tim.tahapAktif !== paket.babak) return res.status(403).json({ success: false, message: "Akses ditolak! Paket ini bukan untuk babak Anda." });
+            if (!tim || tim.isEliminated) return res.status(403).json({ success: false, message: "Tim tereliminasi." });
+            if (tim.tahapAktif !== paket.babak) return res.status(403).json({ success: false, message: "Bukan babak Anda." });
 
-            if (paket.babak === 'penyisihan') {
-                const namaPaket = paket.nama.toLowerCase();
-                let targetGrup = null;
-                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-
-                if (targetGrup !== null && tim.grup !== targetGrup) {
-                    return res.status(403).json({ success: false, message: "Sabar! Ini belum giliran grup Anda." });
-                }
-            }
-            
             const soalStrategi = await prisma.soal.findMany({
                 where: { paketSoalId: parseInt(paketId), status: 'belum' },
                 select: { id: true, kategori: true },
@@ -85,32 +65,26 @@ export const pesertaController = {
             if (!tim || tim.isEliminated) return res.status(403).json({ success: false, message: "Tim tereliminasi." });
             if (tim.tahapAktif !== paket.babak) return res.status(403).json({ success: false, message: "Bukan babak Anda." });
 
-            if (paket.babak === 'penyisihan') {
-                const namaPaket = paket.nama.toLowerCase();
-                let targetGrup = null;
-                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-
-                if (targetGrup !== null && tim.grup !== targetGrup) {
-                    return res.status(403).json({ success: false, message: "Bukan giliran grup Anda." });
-                }
-            }
-
             let totalPoin = 0;
 
+            // 👇 BUG FIXED: Mencegah string concatenate ("20" + "20" = "2020") dengan parseInt
             if (tim.tahapAktif === 'semi_final') {
-                if (daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus mengisi nilai untuk tepat 10 soal pada Game ini!" });
+                if (daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus tepat 10 soal pada Game ini!" });
                 for (const taruhan of daftarTaruhan) {
-                    if (taruhan.poin < 10 || taruhan.poin > 100) return res.status(400).json({ success: false, message: "Poin harus 10-100!" });
-                    totalPoin += taruhan.poin;
+                    const poinInt = parseInt(taruhan.poin, 10);
+                    if (isNaN(poinInt) || poinInt < 10 || poinInt > 100) return res.status(400).json({ success: false, message: "Poin harus angka 10-100!" });
+                    taruhan.poin = poinInt; // Tulis ulang nilai asli dengan angka
+                    totalPoin += poinInt;
                 }
-                if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin taruhan di Game ini melebihi batas 200!" });
+                if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin melebihi batas 200!" });
             }
             else if (tim.tahapAktif === 'final') {
                 if (daftarTaruhan.length !== 20) return res.status(400).json({ success: false, message: "Harus tepat 20 soal!" });
                 for (const taruhan of daftarTaruhan) {
-                    if (taruhan.poin < 10 || taruhan.poin > 50) return res.status(400).json({ success: false, message: "Poin harus 10-50!" });
-                    totalPoin += taruhan.poin;
+                    const poinInt = parseInt(taruhan.poin, 10);
+                    if (isNaN(poinInt) || poinInt < 10 || poinInt > 50) return res.status(400).json({ success: false, message: "Poin harus angka 10-50!" });
+                    taruhan.poin = poinInt;
+                    totalPoin += poinInt;
                 }
             }
 
@@ -136,18 +110,8 @@ export const pesertaController = {
                 where: { status: 'aktif' },
                 select: { id: true, pertanyaan: true, foto: true, kategori: true, tipe: true, opsiJawaban: true, waktuMulai: true, poin: true, paketSoal: { select: { nama: true, babak: true } } }
             });
+
             if (!soalAktif) return res.status(404).json({ success: false, message: "Belum ada soal dimulai." });
-
-            if (soalAktif.paketSoal.babak === 'penyisihan') {
-                const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
-                let targetGrup = null;
-                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-
-                if (targetGrup !== null && tim.grup !== targetGrup) {
-                    return res.status(403).json({ success: false, message: "Sabar! Ini belum giliran grup Anda bertanding." });
-                }
-            }
 
             const riwayat = await prisma.riwayatJawaban.findFirst({ where: { timId, soalId: soalAktif.id } });
             let sisaWaktu = 0;
@@ -206,17 +170,6 @@ export const pesertaController = {
 
             if (paket) {
                 const namaPaket = paket.nama.toLowerCase();
-
-                if (paket.babak === 'penyisihan') {
-                    let targetGrup = null;
-                    if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                    else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-
-                    if (targetGrup !== null && tim.grup !== targetGrup) {
-                        return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
-                    }
-                }
-
                 if (paket.babak === 'semi_final' && !namaPaket.includes('rebutan')) {
                     return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
                 }
@@ -252,31 +205,12 @@ export const pesertaController = {
             const soal = await prisma.soal.findUnique({ where: { id: parseInt(soalId) }, include: { paketSoal: true } });
             if (!soal || soal.status !== 'aktif') return res.status(400).json({ success: false, message: "Soal ditutup!" });
 
-            if (soal.paketSoal.babak === 'penyisihan') {
-                const namaPaket = soal.paketSoal.nama.toLowerCase();
-                let targetGrup = null;
-                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
-                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
-
-                if (targetGrup !== null && tim.grup !== targetGrup) {
-                    return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
-                }
-            }
-
             const cekRiwayat = await prisma.riwayatJawaban.findFirst({ where: { timId, soalId: soal.id } });
             if (cekRiwayat) return res.status(400).json({ success: false, message: "Anda sudah menjawab!" });
 
-            let durasiDetik = 0;
-            const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
             if (gameState.isPaused) return res.status(403).json({ success: false, message: "Game sedang di-jeda." });
-
-            if (gameState.soalAktifId === soal.id) {
-                if (gameState.sisaWaktu <= 0) return res.status(400).json({ success: false, message: "Waktu habis." });
-                durasiDetik = DURASI - gameState.sisaWaktu;
-            } else {
-                durasiDetik = Math.floor((new Date().getTime() - soal.waktuMulai.getTime()) / 1000);
-                if (durasiDetik > DURASI) return res.status(400).json({ success: false, message: "Waktu habis." });
-            }
+            if (gameState.sisaWaktu <= 0) return res.status(400).json({ success: false, message: "Waktu habis." });
+            const durasiDetik = (parseInt(process.env.DURASI_SOAL) || 180) - gameState.sisaWaktu;
 
             const isBenar = jawabanTim.toString().trim().toLowerCase() === soal.jawabanBenar.trim().toLowerCase();
             let poinDidapat = 0;

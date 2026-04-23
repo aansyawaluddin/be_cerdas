@@ -21,7 +21,7 @@ const triggerAutoNext = async (io, paketId) => {
             } catch (error) {
                 console.error("[AUTO-NEXT ERROR]:", error.message);
             }
-        }, 5000); 
+        }, 5000);
     } else {
         console.log(`[GAME] Game berhenti. Menunggu tindakan Admin klik Next...`);
     }
@@ -29,28 +29,29 @@ const triggerAutoNext = async (io, paketId) => {
 
 export const mulaiFaseStrategi = async (io, paketId) => {
     try {
-        const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180; // 3 Menit
+        const DURASI = parseInt(process.env.DURASI_STRATEGI) || 180; 
         console.log(`[GAME] Memulai Fase Strategi untuk Paket ${paketId}`);
         faseAktif = 'strategi';
         sisaWaktu = DURASI;
         paketAktifId = paketId;
+        isPaused = false;
 
         io.emit('fase_strategi_mulai', { paketId, sisaWaktu });
         if (timerInterval) clearInterval(timerInterval);
 
         timerInterval = setInterval(async () => {
-            if (isPaused) return;
+            if (isPaused) return; 
             sisaWaktu--;
             io.emit('timer_strategi_update', { sisaWaktu });
 
             if (sisaWaktu <= 0) {
                 clearInterval(timerInterval);
-                console.log(`[GAME] Waktu Strategi Habis. Bersiap masuk ke Soal 1...`);
+                console.log(`[GAME] Waktu Strategi Habis. Bersiap masuk ke Soal...`);
                 io.emit('fase_strategi_selesai', { message: 'Waktu habis! Mempersiapkan soal...' });
 
                 setTimeout(() => {
                     mulaiSiklusPaket(io, paketId);
-                }, 5000); // Jeda 5 detik dari strategi ke soal
+                }, 5000); 
             }
         }, 1000);
         return true;
@@ -105,7 +106,7 @@ export const mulaiJedaIstirahat = (io, currentPaketId) => {
 
 export const mulaiSiklusPaket = async (io, paketId) => {
     try {
-        const DURASI = parseInt(process.env.DURASI_SOAL) || 180; // 3 Menit Soal
+        const DURASI = parseInt(process.env.DURASI_SOAL) || 180; 
         paketAktifId = paketId;
         isPaused = false;
         timPencetBelId = null;
@@ -141,10 +142,8 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         soalAktifId = soalAktif.id;
 
         if (soalAktif.tipe === 'memori') {
-            console.log(`[GAME] Memulai Soal MEMORI ID: ${soalAktifId}`);
-
             faseAktif = 'memori_gambar';
-            sisaWaktu = 30; // 30 Detik tampil gambar
+            sisaWaktu = 30; 
             io.emit('memori_gambar_mulai', { soalId: soalAktifId, sisaWaktu });
 
             if (timerInterval) clearInterval(timerInterval);
@@ -159,7 +158,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                     faseAktif = 'memori_jeda';
                     sisaWaktu = 5;
                     io.emit('memori_jeda_mulai', { soalId: soalAktifId, sisaWaktu });
-                    console.log(`[GAME] Jeda Memori (5s) sebelum pertanyaan muncul...`);
 
                     timerInterval = setInterval(async () => {
                         if (isPaused) return;
@@ -168,7 +166,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
                         if (sisaWaktu <= 0) {
                             clearInterval(timerInterval);
-
                             faseAktif = 'soal';
                             sisaWaktu = DURASI;
 
@@ -178,7 +175,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                             });
 
                             io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
-                            console.log(`[GAME] Pertanyaan Memori Muncul!`);
 
                             timerInterval = setInterval(async () => {
                                 if (isPaused) return;
@@ -190,8 +186,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
                                     io.emit('waktu_habis', { soalId: soalAktifId });
                                     await prosesEliminasiOtomatis(io, soalAktifId);
-
-            
                                     await triggerAutoNext(io, paketId);
                                 }
                             }, 1000);
@@ -204,7 +198,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
             faseAktif = 'soal';
             sisaWaktu = DURASI;
             io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
-            console.log(`[GAME] Menjalankan Soal Normal ID: ${soalAktifId}`);
 
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(async () => {
@@ -217,15 +210,12 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
                     io.emit('waktu_habis', { soalId: soalAktifId });
                     await prosesEliminasiOtomatis(io, soalAktifId);
-
                     await triggerAutoNext(io, paketId);
                 }
             }, 1000);
         }
-
         return soalAktif;
     } catch (error) {
-        console.error("[ERROR SIKLUS]:", error);
         return null;
     }
 };
@@ -235,7 +225,6 @@ export const selesaikanSoalSekarang = async (io, paketId) => {
     if (soalAktifId) {
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
         io.emit('waktu_habis', { soalId: soalAktifId });
-        console.log(`[GAME] Soal ID ${soalAktifId} ditutup karena sudah dijawab di babak rebutan.`);
         await triggerAutoNext(io, paketId);
     }
 };
@@ -269,49 +258,25 @@ export const forceStopTimer = () => {
 };
 
 export const getGameState = () => {
-    return {
-        isPaused,
-        sisaWaktu,
-        soalAktifId,
-        paketAktifId,
-        faseAktif,
-        timPencetBelId
-    };
+    return { isPaused, sisaWaktu, soalAktifId, paketAktifId, faseAktif, timPencetBelId };
 };
 
 export const lanjutSoalBerikutnya = async (io) => {
     if (!paketAktifId) throw new Error("Tidak ada paket soal yang aktif saat ini.");
 
-    const paket = await prisma.paketSoal.findUnique({
-        where: { id: parseInt(paketAktifId) }
-    });
+    // 👇 BUG FIXED: Jika Admin klik 'Next' saat Fase Strategi, langsung skip ke Soal.
+    if (faseAktif === 'strategi') {
+        console.log(`[GAME] Admin men-skip Fase Strategi. Memulai pertanyaan...`);
+        if (timerInterval) clearInterval(timerInterval);
+        mulaiSiklusPaket(io, paketAktifId);
+        return true;
+    }
 
+    const paket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketAktifId) } });
     const soalSekarang = soalAktifId ? await prisma.soal.findUnique({ where: { id: soalAktifId } }) : null;
 
     if (soalSekarang && soalSekarang.status === 'aktif') {
-        if (!paket.nama.toLowerCase().includes('rebutan')) {
-            const totalJawabanMasuk = await prisma.riwayatJawaban.count({
-                where: { soalId: soalAktifId }
-            });
-
-            let filterTim = { role: 'peserta', tahapAktif: paket.babak, isEliminated: false };
-            if (paket.babak === 'penyisihan') {
-                const namaP = paket.nama.toLowerCase();
-                if (/\b(a|1)\b/.test(namaP)) filterTim.grup = 1;
-                else if (/\b(b|2)\b/.test(namaP)) filterTim.grup = 2;
-                else if (/\b(c|3)\b/.test(namaP)) filterTim.grup = 3;
-                else if (/\b(d|4)\b/.test(namaP)) filterTim.grup = 4;
-            }
-            const totalPesertaSeharusnya = await prisma.tim.count({ where: filterTim });
-
-            if (totalJawabanMasuk < totalPesertaSeharusnya) {
-                throw new Error(`Sabar! Baru ${totalJawabanMasuk} dari ${totalPesertaSeharusnya} tim yang menjawab.`);
-            }
-        }
-
         if (timerInterval) clearInterval(timerInterval);
-        console.log(`[GAME] Timer dihentikan paksa.`);
-
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
         io.emit('waktu_habis', { soalId: soalAktifId });
         await prosesEliminasiOtomatis(io, soalAktifId);
@@ -322,8 +287,9 @@ export const lanjutSoalBerikutnya = async (io) => {
             where: { paketSoalId: parseInt(paketAktifId), status: 'selesai' }
         });
 
-        if (jumlahSelesai % 10 === 0 && jumlahSelesai < 50) {
-            console.log(`[GAME] Game Selesai. Masuk Fase Strategi untuk 10 Soal Berikutnya (Soal ${jumlahSelesai + 1}-${jumlahSelesai + 10})...`);
+        // 👇 BUG FIXED: Pastikan ini tidak ter-trigger di soal ke-0 saat baru mulai
+        if (jumlahSelesai > 0 && jumlahSelesai % 10 === 0 && jumlahSelesai < 50 && faseAktif !== 'strategi') {
+            console.log(`[GAME] 10 Soal Selesai. Masuk Fase Strategi Berikutnya...`);
             mulaiFaseStrategi(io, paketAktifId);
             return true;
         }
@@ -331,7 +297,6 @@ export const lanjutSoalBerikutnya = async (io) => {
 
     console.log(`[GAME] Memuat soal berikutnya...`);
     mulaiSiklusPaket(io, paketAktifId);
-
     return true;
 };
 
@@ -416,8 +381,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
             const namaPaket = soal.paketSoal.nama.toLowerCase();
             if (/\b(a|1)\b/.test(namaPaket)) grupAktif = 1;
             else if (/\b(b|2)\b/.test(namaPaket)) grupAktif = 2;
-            else if (/\b(c|3)\b/.test(namaPaket)) grupAktif = 3;
-            else if (/\b(d|4)\b/.test(namaPaket)) grupAktif = 4;
 
             if (grupAktif === null) return;
 
