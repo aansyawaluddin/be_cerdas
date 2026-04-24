@@ -170,9 +170,35 @@ export const pesertaController = {
 
             if (paket) {
                 const namaPaket = paket.nama.toLowerCase();
-                if (paket.babak === 'semi_final' && !namaPaket.includes('rebutan')) {
-                    return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
+
+                if (paket.babak === 'penyisihan') {
+                    let targetGrup = null;
+                    if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
+                    else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
+
+                    if (targetGrup !== null && tim.grup !== targetGrup) {
+                        return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
+                    }
                 }
+
+                if (paket.babak === 'semi_final') {
+                    // Blokir bel di Score Battle biasa
+                    if (!namaPaket.includes('rebutan')) {
+                        return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
+                    }
+
+                    // 👇 CEK SISTEM GEMBOK: Tolak tim yang sudah aman di babak Rebutan
+                    const { getSafeTeamsForRebutan } = await import('../sockets/gameHandler.js');
+                    const safeTeams = getSafeTeamsForRebutan();
+
+                    if (safeTeams.includes(timId)) {
+                        return res.status(403).json({
+                            success: false,
+                            message: "Sssst! Tim Anda sudah lolos AMAN ke Final. Beri kesempatan tim yang seri untuk berebut kursi."
+                        });
+                    }
+                }
+
                 if (paket.babak === 'final' && (namaPaket.includes('game 2') || namaPaket.includes('score battle'))) {
                     return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
                 }
