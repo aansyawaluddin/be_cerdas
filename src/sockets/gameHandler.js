@@ -99,12 +99,12 @@ export const mulaiSiklusPaket = async (io, paketId) => {
             data: { status: 'selesai' }
         });
 
-        const soalBerikutnya = await prisma.soal.findFirst({
+        const soalBelum = await prisma.soal.findMany({
             where: { paketSoalId: parseInt(paketId), status: 'belum' },
             orderBy: { id: 'asc' }
         });
 
-        if (!soalBerikutnya) {
+        if (soalBelum.length === 0) {
             console.log(`[GAME] Paket ${paketId} Selesai.`);
             const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
 
@@ -115,6 +115,21 @@ export const mulaiSiklusPaket = async (io, paketId) => {
             }
             return null;
         }
+
+        const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+        const namaPaketL = infoPaket.nama.toLowerCase();
+
+        let poolSoal = soalBelum;
+
+        if (infoPaket.babak === 'semi_final' && !namaPaketL.includes('rebutan')) {
+            poolSoal = soalBelum.slice(0, 10);
+        }
+        else if (infoPaket.babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle'))) {
+            poolSoal = soalBelum.slice(0, 20);
+        }
+
+        const randomIndex = Math.floor(Math.random() * poolSoal.length);
+        const soalBerikutnya = poolSoal[randomIndex];
 
         const soalAktif = await prisma.soal.update({
             where: { id: soalBerikutnya.id },

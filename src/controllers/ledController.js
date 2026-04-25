@@ -39,6 +39,12 @@ export const ledController = {
                     sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
 
+                const totalSoalSebelumnya = await prisma.soal.count({
+                    where: { paketSoalId: soalAktif.paketSoalId, id: { lt: soalAktif.id } }
+                });
+                const nomorSoal = totalSoalSebelumnya + 1;
+                const totalSoal = await prisma.soal.count({ where: { paketSoalId: soalAktif.paketSoalId } });
+
                 dataSoal = {
                     id: soalAktif.id,
                     pertanyaan: soalAktif.pertanyaan,
@@ -48,7 +54,9 @@ export const ledController = {
                     opsiJawaban: soalAktif.opsiJawaban,
                     paketNama: soalAktif.paketSoal.nama,
                     babak: soalAktif.paketSoal.babak,
-                    faseAktif: gameState.faseAktif || 'soal'
+                    faseAktif: gameState.faseAktif || 'soal',
+                    nomorSoal: nomorSoal,
+                    totalSoal: totalSoal,
                 };
 
                 if (soalAktif.tipe === 'memori') {
@@ -65,7 +73,6 @@ export const ledController = {
                 }
             }
 
-            // 👇 BUG FIXED: Deteksi otomatis jika game belum di-"Mulai" oleh Admin
             if (!babakAktif) {
                 const cekSemi = await prisma.tim.findFirst({ where: { tahapAktif: 'semi_final' } });
                 babakAktif = cekSemi ? 'semi_final' : 'penyisihan';
@@ -76,8 +83,6 @@ export const ledController = {
                 const namaP = paketNama.toLowerCase();
                 if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
                 else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
-                else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
-                else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
             }
 
             const filterTim = { role: 'peserta', tahapAktif: babakAktif };
@@ -91,15 +96,25 @@ export const ledController = {
             daftarTim = teams.map(tim => {
                 const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
                 const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
+
+                let status = 'MENUNGGU';
+                if (gameState.faseAktif === 'soal') {
+                    status = riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU';
+                }
+
                 return {
                     id: tim.id,
                     nama: tim.nama,
                     fotoTim: tim.fotoTim,
                     poin: skor ? skor.poin : 0,
-                    statusMenjawab: riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU',
+                    statusMenjawab: status,
                     isEliminated: tim.isEliminated
                 };
             }).sort((a, b) => b.poin - a.poin);
+
+            if (gameState.faseAktif === 'strategi') {
+                dataSoal = null;
+            }
 
             return res.status(200).json({
                 success: true,
@@ -114,6 +129,7 @@ export const ledController = {
                 }
             });
         } catch (error) {
+            console.error("Error Get LED Live Game:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     },
@@ -168,6 +184,7 @@ export const ledController = {
                 data: { podium: leaderboard.slice(0, 6), urutanLainnya: leaderboard.slice(6) }
             });
         } catch (error) {
+            console.error("Error Get LED Leaderboard:", error);
             return res.status(500).json({ success: false, error: error.message });
         }
     }

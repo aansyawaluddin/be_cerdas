@@ -183,10 +183,9 @@ export const adminController = {
         }
     },
 
-    // API Khusus Game 4 (Juri Input)
     inputNilaiJuri: async (req, res) => {
         try {
-            const { timId, nilai } = req.body; // nilai = 1 sampai 100
+            const { timId, nilai } = req.body; 
 
             if (!timId || nilai === undefined) return res.status(400).json({ success: false, message: "Data tidak lengkap!" });
             if (nilai < 1 || nilai > 100) return res.status(400).json({ success: false, message: "Nilai juri harus 1 - 100." });
@@ -420,7 +419,6 @@ export const adminController = {
         }
     },
 
-    // Tutup soal saat ini tanpa menunggu semua tim menjawab (untuk game 3 & 4 final)
     tutupSoalAktif: async (req, res) => {
         try {
             const io = req.app.get('io');
