@@ -9,7 +9,8 @@
     "seed:admin": "node prisma/seedAdmin.js",
     "seed:tim": "node prisma/seedTim.js",
     "seed:soal": "node prisma/seedSoal.js",
-    "seed:semifinal": "node prisma/seed-semifinal.js"
+    "seed:semifinal": "node prisma/seed-semifinal.js",
+    "seed:final": "node prisma/seed-final.js"
   },
   "keywords": [],
   "author": "",
