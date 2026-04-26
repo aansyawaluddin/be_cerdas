@@ -157,7 +157,7 @@ export const adminController = {
                 for (const tim of timFinal) {
                     await tx.skorBabak.upsert({
                         where: { timId_babak: { timId: tim.id, babak: 'final' } },
-                        update: { poin: 1000 },
+                        update: { poin: { increment: 1000 } },
                         create: { timId: tim.id, babak: 'final', poin: 1000 }
                     });
                 }
@@ -165,12 +165,13 @@ export const adminController = {
 
             const io = req.app.get('io');
             if (io) {
+                // Memaksa layar LED dan Peserta me-refresh poin mereka
                 io.emit('leaderboard_update', { babak: 'final' });
             }
 
             return res.status(200).json({
                 success: true,
-                message: `Berhasil! Modal 1000 poin telah disuntikkan kepada ${timFinal.length} tim Finalis.`,
+                message: `Berhasil! Modal 1000 poin telah ditambahkan kepada ${timFinal.length} tim Finalis untuk modal Game 2.`,
                 data: timFinal.map(t => ({ id: t.id, nama: t.nama }))
             });
         } catch (error) {
