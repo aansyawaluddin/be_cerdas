@@ -28,6 +28,8 @@ const triggerAutoNext = async (io, paketId) => {
                 console.error("[AUTO-NEXT ERROR]:", error.message);
             }
         }, 5000);
+    } else {
+        console.log(`[GAME] Game berhenti. Menunggu tindakan Admin klik Next...`);
     }
 };
 
@@ -110,6 +112,9 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
             if (infoPaket && infoPaket.babak !== 'penyisihan') {
                 io.emit('paket_selesai', { message: "Ronde ini telah selesai. Sedang merekap poin..." });
+                if (infoPaket.babak === 'semi_final') {
+                    io.emit('semi_final_selesai', { message: "Babak Semi Final telah selesai!" });
+                }
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
             }
@@ -395,6 +400,17 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     return { id: tim.id, nama: tim.nama, poin: skor ? skor.poin : 0 };
                 }).sort((a, b) => b.poin - a.poin);
 
+                // Fungsi Internal untuk Mempromosikan Tim ke Final
+                const promosikanTop6KeFinal = async (timList) => {
+                    const top6 = timList.slice(0, 6);
+                    console.log(`[GAME] Mempromosikan ${top6.length} tim ke Final secara otomatis...`);
+                    await prisma.$transaction(async (tx) => {
+                        for (const tim of top6) {
+                            await tx.tim.update({ where: { id: tim.id }, data: { tahapAktif: 'final' } });
+                        }
+                    });
+                };
+
                 if (!isRebutan) {
                     const rank6 = klasemenAkhir[5];
                     const rank7 = klasemenAkhir[6];
@@ -402,11 +418,11 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     if (rank6 && rank7 && rank6.poin === rank7.poin) {
                         console.log(`[GAME] SERI TERDETEKSI DI PERINGKAT 6!`);
                         const poinBatas = rank6.poin;
-
                         const timGugurPasti = klasemenAkhir.filter(t => t.poin < poinBatas);
                         for (const tim of timGugurPasti) {
                             await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                         }
+
                         safeTeamsForRebutan = klasemenAkhir.filter(t => t.poin > poinBatas).map(t => t.id);
                         io.emit('peringatan_seri', { message: "Ada nilai SERI di zona eliminasi! Lanjutkan ke Game Rebutan." });
                     } else {
@@ -414,6 +430,8 @@ async function prosesEliminasiOtomatis(io, soalId) {
                         for (const tim of timGugur) {
                             await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                         }
+                        await promosikanTop6KeFinal(klasemenAkhir);
+                        io.emit('semi_final_selesai', { message: "Babak Semi Final Selesai! Top 6 otomatis melaju ke Final dengan modal 1000 poin." });
                     }
                 } else {
                     safeTeamsForRebutan = [];
@@ -421,6 +439,8 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     for (const tim of timGugur) {
                         await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                     }
+                    await promosikanTop6KeFinal(klasemenAkhir);
+                    io.emit('semi_final_selesai', { message: "Babak Rebutan Selesai! Top 6 otomatis melaju ke Final dengan modal 1000 poin." });
                 }
             }
             return;

@@ -145,26 +145,16 @@ export const adminController = {
 
     inisialisasiFinal: async (req, res) => {
         try {
-            const timLolos = await prisma.tim.findMany({
-                where: { tahapAktif: 'semi_final', isEliminated: false, role: 'peserta' },
-                include: { skorBabak: { where: { babak: 'semi_final' } } }
+            const timFinal = await prisma.tim.findMany({
+                where: { tahapAktif: 'final', isEliminated: false, role: 'peserta' }
             });
 
-            const klasemen = timLolos.map(tim => {
-                const skor = tim.skorBabak.length > 0 ? tim.skorBabak[0].poin : 0;
-                return { ...tim, totalPoin: skor };
-            }).sort((a, b) => b.totalPoin - a.totalPoin);
-
-            const top6 = klasemen.slice(0, 6);
-
-            if (top6.length === 0) {
-                return res.status(404).json({ success: false, message: "Tidak ada tim yang bisa dipromosikan ke Final." });
+            if (timFinal.length === 0) {
+                return res.status(404).json({ success: false, message: "Belum ada tim di babak Final." });
             }
 
             await prisma.$transaction(async (tx) => {
-                for (const tim of top6) {
-                    await tx.tim.update({ where: { id: tim.id }, data: { tahapAktif: 'final' } });
-
+                for (const tim of timFinal) {
                     await tx.skorBabak.upsert({
                         where: { timId_babak: { timId: tim.id, babak: 'final' } },
                         update: { poin: 1000 },
@@ -173,10 +163,15 @@ export const adminController = {
                 }
             });
 
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('leaderboard_update', { babak: 'final' });
+            }
+
             return res.status(200).json({
                 success: true,
-                message: `Luar Biasa! ${top6.length} tim melaju ke Grand Final dengan modal 1000 poin.`,
-                data: top6.map(t => ({ id: t.id, nama: t.nama }))
+                message: `Berhasil! Modal 1000 poin telah disuntikkan kepada ${timFinal.length} tim Finalis.`,
+                data: timFinal.map(t => ({ id: t.id, nama: t.nama }))
             });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -185,7 +180,7 @@ export const adminController = {
 
     inputNilaiJuri: async (req, res) => {
         try {
-            const { timId, nilai } = req.body; 
+            const { timId, nilai } = req.body;
 
             if (!timId || nilai === undefined) return res.status(400).json({ success: false, message: "Data tidak lengkap!" });
             if (nilai < 1 || nilai > 100) return res.status(400).json({ success: false, message: "Nilai juri harus 1 - 100." });
@@ -435,5 +430,61 @@ export const adminController = {
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }
-    }
+    },
+
+    resetSemiFinalFull: async (req, res) => {
+        try {
+            // 1. Matikan semua timer yang berjalan
+            forceStopTimer();
+
+            const io = req.app.get('io');
+
+            await prisma.$transaction(async (tx) => {
+                // 2. Kembalikan semua tim (yang masuk semi_final) ke tahap penyisihan
+                await tx.tim.updateMany({
+                    where: { tahapAktif: 'semi_final', isEliminated: false },
+                    data: { tahapAktif: 'penyisihan' }
+                });
+
+                // 3. Hapus semua skor di babak semi_final
+                await tx.skorBabak.deleteMany({
+                    where: { babak: 'semi_final' }
+                });
+
+                // 4. Cari semua paket yang bertipe semi_final
+                const paketSemiFinal = await tx.paketSoal.findMany({
+                    where: { babak: 'semi_final' }
+                });
+                const idPakets = paketSemiFinal.map(p => p.id);
+
+                if (idPakets.length > 0) {
+                    // 5. Hapus semua riwayat jawaban dan taruhan untuk paket semi_final
+                    await tx.riwayatJawaban.deleteMany({
+                        where: { soal: { paketSoalId: { in: idPakets } } }
+                    });
+
+                    await tx.taruhanSoal.deleteMany({
+                        where: { soal: { paketSoalId: { in: idPakets } } }
+                    });
+
+                    // 6. Reset status soal kembali ke 'belum'
+                    await tx.soal.updateMany({
+                        where: { paketSoalId: { in: idPakets } },
+                        data: { status: 'belum', waktuMulai: null }
+                    });
+                }
+            });
+
+            if (io) {
+                io.emit('game_reset', { message: "Seluruh Babak Semi Final telah di-reset secara paksa oleh Admin." });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "RESET BERHASIL: Status tim dikembalikan ke Penyisihan dan seluruh poin Semi Final dihapus!"
+            });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 };
