@@ -158,7 +158,7 @@ export const adminController = {
                     await tx.skorBabak.upsert({
                         where: { timId_babak: { timId: tim.id, babak: 'final' } },
                         update: { poin: { increment: 1000 } },
-                        create: { timId: tim.id, babak: 'final', poin: 1000 }
+                        create: { timId: tim.id, babak: 'final', poin: 400 }
                     });
                 }
             });
