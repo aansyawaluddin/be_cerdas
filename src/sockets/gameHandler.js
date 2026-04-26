@@ -13,6 +13,68 @@ let timPencetBelId = null;
 let safeTeamsForRebutan = [];
 export const getSafeTeamsForRebutan = () => safeTeamsForRebutan;
 
+async function hukumTimTidakMenjawab(io, soalId) {
+    try {
+        const soal = await prisma.soal.findUnique({ where: { id: soalId }, include: { paketSoal: true } });
+        if (!soal) return;
+
+        const babak = soal.paketSoal.babak;
+        const namaPaketL = soal.paketSoal.nama.toLowerCase();
+
+        const isScoreBattle = (babak === 'semi_final' && !namaPaketL.includes('rebutan')) ||
+            (babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle')));
+
+        if (!isScoreBattle) return;
+
+        const timAktif = await prisma.tim.findMany({
+            where: { tahapAktif: babak, isEliminated: false }
+        });
+
+        const riwayat = await prisma.riwayatJawaban.findMany({
+            where: { soalId: soalId }
+        });
+        const idSudahMenjawab = riwayat.map(r => r.timId);
+
+        const timBolos = timAktif.filter(t => !idSudahMenjawab.includes(t.id));
+
+        for (const tim of timBolos) {
+            const taruhan = await prisma.taruhanSoal.findUnique({
+                where: { timId_soalId: { timId: tim.id, soalId: soalId } }
+            });
+
+            const poinMinus = -(taruhan ? taruhan.poin : 10);
+
+            await prisma.riwayatJawaban.create({
+                data: {
+                    timId: tim.id,
+                    soalId: soalId,
+                    jawabanTim: "TIDAK MENJAWAB (WAKTU HABIS)",
+                    isBenar: false,
+                    poinDidapat: poinMinus
+                }
+            });
+
+            await prisma.skorBabak.update({
+                where: { timId_babak: { timId: tim.id, babak: babak } },
+                data: { poin: { increment: poinMinus } }
+            });
+
+            if (io) {
+                io.emit('update_layar_led', {
+                    timId: tim.id,
+                    namaSekolah: tim.nama,
+                    status: 'SALAH',
+                    poinTambahan: poinMinus,
+                    waktuDetik: 0
+                });
+            }
+            console.log(`[GAME PENALTY] Tim ${tim.nama} dihukum ${poinMinus} poin karena tidak menjawab.`);
+        }
+    } catch (error) {
+        console.error("[ERROR HUKUMAN TIDAK MENJAWAB]:", error);
+    }
+}
+
 const promoteToFinal = async (timLolos, io) => {
     console.log(`[GAME] Mempromosikan ${timLolos.length} tim ke Grand Final...`);
     await prisma.$transaction(async (tx) => {
@@ -191,6 +253,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                                 if (sisaWaktu <= 0) {
                                     clearInterval(timerInterval);
                                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+                                    await hukumTimTidakMenjawab(io, soalAktifId);
                                     io.emit('waktu_habis', { soalId: soalAktifId });
                                     await prosesEliminasiOtomatis(io, soalAktifId);
                                     await triggerAutoNext(io, paketId);
@@ -215,6 +278,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
                 if (sisaWaktu <= 0) {
                     clearInterval(timerInterval);
                     await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+                    await hukumTimTidakMenjawab(io, soalAktifId);
                     io.emit('waktu_habis', { soalId: soalAktifId });
                     await prosesEliminasiOtomatis(io, soalAktifId);
                     await triggerAutoNext(io, paketId);
@@ -231,6 +295,7 @@ export const selesaikanSoalSekarang = async (io, paketId) => {
     if (timerInterval) clearInterval(timerInterval);
     if (soalAktifId) {
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+        await hukumTimTidakMenjawab(io, soalAktifId);
         io.emit('waktu_habis', { soalId: soalAktifId });
         await prosesEliminasiOtomatis(io, soalAktifId);
         await triggerAutoNext(io, paketId);
@@ -320,6 +385,7 @@ export const lanjutSoalBerikutnya = async (io) => {
         console.log(`[GAME] Timer dihentikan paksa. Memproses penutupan soal...`);
 
         await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+        await hukumTimTidakMenjawab(io, soalAktifId);
         io.emit('waktu_habis', { soalId: soalAktifId });
         await prosesEliminasiOtomatis(io, soalAktifId);
     }
