@@ -13,6 +13,109 @@ let timPencetBelId = null;
 let safeTeamsForRebutan = [];
 export const getSafeTeamsForRebutan = () => safeTeamsForRebutan;
 
+export const prosesKlasemenUmum = async (daftarTimAktif, babak) => {
+    if (babak === 'semi_final') {
+        return await prosesKlasemenSemiFinal(daftarTimAktif);
+    }
+
+    const timIds = daftarTimAktif.map(t => t.id);
+    const semuaRiwayat = await prisma.riwayatJawaban.findMany({
+        where: { timId: { in: timIds }, isBenar: true, soal: { paketSoal: { babak: babak } } },
+        include: { soal: true }
+    });
+
+    const mapped = daftarTimAktif.map(tim => {
+        const skorObj = tim.skorBabak ? tim.skorBabak.find(s => s.babak === babak) : null;
+        const poinTotal = skorObj ? skorObj.poin : (tim.poin || 0);
+
+        let totalWaktu = 0;
+        const riwayatTim = semuaRiwayat.filter(r => r.timId === tim.id);
+        riwayatTim.forEach(r => {
+            if (r.soal && r.soal.waktuMulai) {
+                const waktuPencet = r.waktuMenjawab || r.createdAt;
+                if (waktuPencet) {
+                    totalWaktu += new Date(waktuPencet).getTime() - new Date(r.soal.waktuMulai).getTime();
+                }
+            }
+        });
+
+        return { ...tim, poin: poinTotal, totalWaktu };
+    });
+
+    mapped.sort((a, b) => {
+        if (b.poin !== a.poin) return b.poin - a.poin;
+        return a.totalWaktu - b.totalWaktu;
+    });
+
+    return mapped;
+};
+
+export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
+    const paketRebutan = await prisma.paketSoal.findFirst({
+        where: { babak: 'semi_final', nama: { contains: 'rebutan' } },
+        include: { daftarSoal: { select: { id: true } } }
+    });
+    const soalRebutanIds = paketRebutan ? paketRebutan.daftarSoal.map(s => s.id) : [];
+    const riwayatRebutan = await prisma.riwayatJawaban.findMany({
+        where: { soalId: { in: soalRebutanIds }, isBenar: true }
+    });
+
+    const timIds = daftarTimAktif.map(t => t.id);
+    const semuaRiwayat = await prisma.riwayatJawaban.findMany({
+        where: { timId: { in: timIds }, isBenar: true, soal: { paketSoal: { babak: 'semi_final' } } },
+        include: { soal: true }
+    });
+
+    const mapped = daftarTimAktif.map(tim => {
+        const skorObj = tim.skorBabak ? tim.skorBabak.find(s => s.babak === 'semi_final') : null;
+        const poinTotal = skorObj ? skorObj.poin : (tim.poin || 0);
+        const poinRebutan = riwayatRebutan.filter(r => r.timId === tim.id).reduce((sum, r) => sum + r.poinDidapat, 0);
+
+        let totalWaktu = 0;
+        const riwayatTim = semuaRiwayat.filter(r => r.timId === tim.id);
+        riwayatTim.forEach(r => {
+            if (r.soal && r.soal.waktuMulai) {
+                const waktuPencet = r.waktuMenjawab || r.createdAt;
+                if (waktuPencet) {
+                    totalWaktu += new Date(waktuPencet).getTime() - new Date(r.soal.waktuMulai).getTime();
+                }
+            }
+        });
+
+        return { ...tim, poin: poinTotal, poinMurni: poinTotal - poinRebutan, totalWaktu };
+    });
+
+    const klasemenMurni = [...mapped].sort((a, b) => {
+        if (b.poinMurni !== a.poinMurni) return b.poinMurni - a.poinMurni;
+        return a.totalWaktu - b.totalWaktu;
+    });
+
+    const rank6 = klasemenMurni[5];
+    const rank7 = klasemenMurni[6];
+
+    let poinBatas = null;
+    if (rank6 && rank7 && rank6.poinMurni === rank7.poinMurni) {
+        poinBatas = rank6.poinMurni;
+    }
+
+    mapped.sort((a, b) => {
+        if (poinBatas !== null) {
+            const isASafe = a.poinMurni > poinBatas;
+            const isBSafe = b.poinMurni > poinBatas;
+            if (isASafe && !isBSafe) return -1;
+            if (!isASafe && isBSafe) return 1;
+        }
+        if (b.poin !== a.poin) return b.poin - a.poin;
+        return a.totalWaktu - b.totalWaktu;
+    });
+
+    return mapped.map(t => ({
+        ...t,
+        isAman: poinBatas !== null && t.poinMurni > poinBatas,
+        isRebutan: poinBatas !== null && t.poinMurni === poinBatas
+    }));
+};
+
 async function hukumTimTidakMenjawab(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({ where: { id: soalId }, include: { paketSoal: true } });
@@ -54,9 +157,10 @@ async function hukumTimTidakMenjawab(io, soalId) {
                 }
             });
 
-            await prisma.skorBabak.update({
+            await prisma.skorBabak.upsert({
                 where: { timId_babak: { timId: tim.id, babak: babak } },
-                data: { poin: { increment: poinMinus } }
+                update: { poin: { increment: poinMinus } },
+                create: { timId: tim.id, babak: babak, poin: poinMinus }
             });
 
             if (io) {
@@ -80,9 +184,14 @@ const promoteToFinal = async (timLolos, io) => {
     await prisma.$transaction(async (tx) => {
         for (const tim of timLolos) {
             await tx.tim.update({ where: { id: tim.id }, data: { tahapAktif: 'final' } });
+            await tx.skorBabak.upsert({
+                where: { timId_babak: { timId: tim.id, babak: 'final' } },
+                update: {},
+                create: { timId: tim.id, babak: 'final', poin: 0 }
+            });
         }
     });
-    io.emit('semi_final_selesai', { message: "Semi Final usai! Top 6 otomatis masuk ke Grand Final dengan 1000 poin." });
+    io.emit('semi_final_selesai', { message: "Semi Final usai! Top 6 otomatis masuk ke Grand Final." });
 };
 
 const triggerAutoNext = async (io, paketId) => {
@@ -182,6 +291,9 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
             if (infoPaket && infoPaket.babak !== 'penyisihan') {
                 io.emit('paket_selesai', { message: "Ronde ini telah selesai. Sedang merekap poin..." });
+                if (infoPaket.babak === 'semi_final') {
+                    io.emit('semi_final_selesai', { message: "Babak Semi Final telah selesai!" });
+                }
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
             }
@@ -466,46 +578,41 @@ async function prosesEliminasiOtomatis(io, soalId) {
                     include: { skorBabak: true }
                 });
 
-                const klasemenAkhir = daftarTimSemiFinal.map(tim => {
-                    const skor = tim.skorBabak.find(s => s.babak === 'semi_final');
-                    return { id: tim.id, nama: tim.nama, poin: skor ? skor.poin : 0 };
-                }).sort((a, b) => {
-                    const isASafe = safeTeamsForRebutan.includes(a.id);
-                    const isBSafe = safeTeamsForRebutan.includes(b.id);
-                    if (isASafe && !isBSafe) return -1;
-                    if (!isASafe && isBSafe) return 1;
-                    return b.poin - a.poin;
-                });
+                const klasemenAkhir = await prosesKlasemenUmum(daftarTimSemiFinal, 'semi_final');
 
                 if (!isRebutan) {
-                    const rank6 = klasemenAkhir[5];
-                    const rank7 = klasemenAkhir[6];
+                    const adaSeriEliminasi = klasemenAkhir.some(t => t.isRebutan);
 
-                    if (rank6 && rank7 && rank6.poin === rank7.poin) {
-                        console.log(`[GAME] SERI TERDETEKSI DI PERINGKAT 6!`);
-                        const poinBatas = rank6.poin;
-
-                        const timGugurPasti = klasemenAkhir.filter(t => t.poin < poinBatas);
+                    if (adaSeriEliminasi) {
+                        console.log(`[GAME] SERI TERDETEKSI! MENGAKTIFKAN PERISAI...`);
+                        const timGugurPasti = klasemenAkhir.filter(t => !t.isAman && !t.isRebutan);
                         for (const tim of timGugurPasti) {
                             await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                         }
-                        safeTeamsForRebutan = klasemenAkhir.filter(t => t.poin > poinBatas).map(t => t.id);
                         io.emit('peringatan_seri', { message: "Ada nilai SERI di zona eliminasi! Lanjutkan ke Game Rebutan." });
                     } else {
+                        console.log(`[GAME] Tidak ada seri. Sapu bersih peringkat 7 ke bawah...`);
                         const timGugur = klasemenAkhir.slice(6);
                         for (const tim of timGugur) {
                             await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                         }
-                        // AUTO PROMOTE TOP 6
                         await promoteToFinal(klasemenAkhir.slice(0, 6), io);
                     }
                 } else {
-                    const timGugur = klasemenAkhir.slice(6);
-                    for (const tim of timGugur) {
+                    console.log(`[GAME] Babak Rebutan Selesai. Eksekusi Kunci Final...`);
+                    const kuotaAman = klasemenAkhir.filter(t => t.isAman).length;
+                    const kuotaSisa = 6 - kuotaAman;
+
+                    const timRebutan = klasemenAkhir.filter(t => !t.isAman);
+                    const timLolosRebutan = timRebutan.slice(0, kuotaSisa);
+                    const timGugurRebutan = timRebutan.slice(kuotaSisa);
+
+                    for (const tim of timGugurRebutan) {
                         await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                     }
-                    await promoteToFinal(klasemenAkhir.slice(0, 6), io);
-                    safeTeamsForRebutan = [];
+
+                    const finalis = [...klasemenAkhir.filter(t => t.isAman), ...timLolosRebutan];
+                    await promoteToFinal(finalis, io);
                 }
             }
             return;
@@ -525,31 +632,14 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
             const daftarTim = await prisma.tim.findMany({
                 where: { grup: grupAktif, tahapAktif: 'penyisihan', isEliminated: false },
-                include: { skorBabak: true, riwayat: { where: { soal: { paketSoalId: paketSoalId } }, include: { soal: true } } }
+                include: { skorBabak: true }
             });
 
             if (daftarTim.length === 0) return;
 
-            const klasemen = daftarTim.map(tim => {
-                const skor = tim.skorBabak.find(s => s.babak === 'penyisihan');
-                let totalPoin = skor ? skor.poin : 0;
-                let totalWaktu = 0;
-                tim.riwayat.forEach(r => {
-                    if (r.isBenar && r.soal.waktuMulai) {
-                        const waktuPencet = r.waktuMenjawab || r.createdAt;
-                        if (waktuPencet) {
-                            totalWaktu += new Date(waktuPencet).getTime() - new Date(r.soal.waktuMulai).getTime();
-                        }
-                    }
-                });
-                return { id: tim.id, nama: tim.nama, totalPoin, totalWaktu };
-            }).sort((a, b) => {
-                if (a.totalPoin !== b.totalPoin) return a.totalPoin - b.totalPoin;
-                if (a.totalWaktu !== b.totalWaktu) return b.totalWaktu - a.totalWaktu;
-                return b.id - a.id;
-            });
+            const klasemen = await prosesKlasemenUmum(daftarTim, 'penyisihan');
 
-            const timTerbawah = klasemen[0];
+            const timTerbawah = klasemen[klasemen.length - 1];
             if (!timTerbawah) return;
 
             await prisma.tim.update({ where: { id: timTerbawah.id }, data: { isEliminated: true } });

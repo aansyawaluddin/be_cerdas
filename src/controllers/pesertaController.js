@@ -67,13 +67,12 @@ export const pesertaController = {
 
             let totalPoin = 0;
 
-            // 👇 BUG FIXED: Mencegah string concatenate ("20" + "20" = "2020") dengan parseInt
             if (tim.tahapAktif === 'semi_final') {
                 if (daftarTaruhan.length !== 10) return res.status(400).json({ success: false, message: "Harus tepat 10 soal pada Game ini!" });
                 for (const taruhan of daftarTaruhan) {
                     const poinInt = parseInt(taruhan.poin, 10);
                     if (isNaN(poinInt) || poinInt < 10 || poinInt > 100) return res.status(400).json({ success: false, message: "Poin harus angka 10-100!" });
-                    taruhan.poin = poinInt; // Tulis ulang nilai asli dengan angka
+                    taruhan.poin = poinInt;
                     totalPoin += poinInt;
                 }
                 if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin melebihi batas 200!" });
@@ -182,16 +181,19 @@ export const pesertaController = {
                 }
 
                 if (paket.babak === 'semi_final') {
-                    // Blokir bel di Score Battle biasa
                     if (!namaPaket.includes('rebutan')) {
                         return res.status(403).json({ success: false, message: "Babak Score Battle tidak menggunakan Bel!" });
                     }
 
-                    // 👇 CEK SISTEM GEMBOK: Tolak tim yang sudah aman di babak Rebutan
-                    const { getSafeTeamsForRebutan } = await import('../sockets/gameHandler.js');
-                    const safeTeams = getSafeTeamsForRebutan();
+                    const semuaTim = await prisma.tim.findMany({
+                        where: { tahapAktif: 'semi_final', isEliminated: false },
+                        include: { skorBabak: true }
+                    });
+                    const { prosesKlasemenSemiFinal } = await import('../sockets/gameHandler.js');
+                    const klasemen = await prosesKlasemenSemiFinal(semuaTim);
 
-                    if (safeTeams.includes(timId)) {
+                    const myTeam = klasemen.find(t => t.id === timId);
+                    if (myTeam && myTeam.isAman) {
                         return res.status(403).json({
                             success: false,
                             message: "Sssst! Tim Anda sudah lolos AMAN ke Final. Beri kesempatan tim yang seri untuk berebut kursi."
@@ -322,13 +324,19 @@ export const pesertaController = {
                 }
             });
 
-            const timDenganSkor = daftarTim.map(tim => {
-                const poinSaatIni = tim.skorBabak.length > 0 ? tim.skorBabak[0].poin : 0;
-                return { timId: tim.id, namaSekolah: tim.nama, foto: tim.fotoTim, totalPoin: poinSaatIni, isEliminated: tim.isEliminated, isMe: tim.id === timId };
-            }).sort((a, b) => b.totalPoin - a.totalPoin);
+            const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
+            const timDenganSkor = await prosesKlasemenUmum(daftarTim, timSaya.tahapAktif);
 
-            const rankedData = timDenganSkor.map((item, index) => ({ rank: index + 1, ...item }));
-            return res.status(200).json({ success: true, tahap: timSaya.tahapAktif, data: rankedData });
+            const formattedData = timDenganSkor.map((tim, index) => ({
+                timId: tim.id,
+                namaSekolah: tim.nama,
+                foto: tim.fotoTim,
+                totalPoin: tim.poin,
+                isEliminated: tim.isEliminated,
+                isMe: tim.id === timId
+            }));
+
+            return res.status(200).json({ success: true, tahap: timSaya.tahapAktif, data: formattedData });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
         }

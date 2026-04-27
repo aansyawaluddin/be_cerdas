@@ -93,24 +93,24 @@ export const ledController = {
                 include: { skorBabak: true, riwayat: soalAktif ? { where: { soalId: soalAktif.id } } : false }
             });
 
-            daftarTim = teams.map(tim => {
-                const skor = tim.skorBabak.find(s => s.babak === tim.tahapAktif);
-                const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
+            const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
+            const daftarTimHasil = await prosesKlasemenUmum(teams, babakAktif);
 
+            daftarTim = daftarTimHasil.map(tim => {
+                const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
                 let status = 'MENUNGGU';
                 if (gameState.faseAktif === 'soal') {
                     status = riwayatJawaban ? (riwayatJawaban.isBenar ? 'BENAR' : 'SALAH') : 'MENUNGGU';
                 }
-
                 return {
                     id: tim.id,
                     nama: tim.nama,
                     fotoTim: tim.fotoTim,
-                    poin: skor ? skor.poin : 0,
+                    poin: tim.poin,
                     statusMenjawab: status,
                     isEliminated: tim.isEliminated
                 };
-            }).sort((a, b) => b.poin - a.poin);
+            });
 
             if (gameState.faseAktif === 'strategi') {
                 dataSoal = null;
@@ -150,8 +150,6 @@ export const ledController = {
                     if (targetBabak === 'penyisihan') {
                         if (/\b(a|1)\b/.test(namaP)) targetGrup = 1;
                         else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
-                        else if (/\b(c|3)\b/.test(namaP)) targetGrup = 3;
-                        else if (/\b(d|4)\b/.test(namaP)) targetGrup = 4;
                     }
                 }
             }
@@ -168,16 +166,16 @@ export const ledController = {
 
             const daftarTim = await prisma.tim.findMany({ where: filter, include: { skorBabak: true } });
 
-            const leaderboard = daftarTim.map(tim => {
-                const skorAktif = tim.skorBabak.find(s => s.babak === targetBabak);
-                return {
-                    id: tim.id,
-                    nama: tim.nama,
-                    fotoTim: tim.fotoTim,
-                    totalPoin: skorAktif ? skorAktif.poin : 0,
-                    isEliminated: tim.isEliminated
-                };
-            }).sort((a, b) => b.totalPoin - a.totalPoin);
+            const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
+            const daftarTimHasil = await prosesKlasemenUmum(daftarTim, targetBabak);
+
+            const leaderboard = daftarTimHasil.map(tim => ({
+                id: tim.id,
+                nama: tim.nama,
+                fotoTim: tim.fotoTim,
+                totalPoin: tim.poin,
+                isEliminated: tim.isEliminated
+            }));
 
             return res.status(200).json({
                 success: true,
