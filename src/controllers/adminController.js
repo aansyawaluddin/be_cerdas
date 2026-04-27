@@ -488,4 +488,53 @@ export const adminController = {
             return res.status(500).json({ success: false, error: error.message });
         }
     },
+
+    resetFinalFull: async (req, res) => {
+        try {
+            forceStopTimer();
+            const io = req.app.get('io');
+
+            await prisma.$transaction(async (tx) => {
+                // 1. Hapus SEMUA skor di babak final (Otomatis kembali jadi 0)
+                await tx.skorBabak.deleteMany({
+                    where: { babak: 'final' }
+                });
+
+                // 2. Ambil semua paket final
+                const paketFinal = await tx.paketSoal.findMany({
+                    where: { babak: 'final' }
+                });
+                const idPakets = paketFinal.map(p => p.id);
+
+                if (idPakets.length > 0) {
+                    // 3. Hapus riwayat jawaban & taruhan untuk babak final
+                    await tx.riwayatJawaban.deleteMany({
+                        where: { soal: { paketSoalId: { in: idPakets } } }
+                    });
+
+                    await tx.taruhanSoal.deleteMany({
+                        where: { soal: { paketSoalId: { in: idPakets } } }
+                    });
+
+                    // 4. Reset status soal final menjadi 'belum'
+                    await tx.soal.updateMany({
+                        where: { paketSoalId: { in: idPakets } },
+                        data: { status: 'belum', waktuMulai: null }
+                    });
+                }
+            });
+
+            if (io) {
+                io.emit('game_reset', { message: "Seluruh Babak Final telah di-reset secara paksa oleh Admin." });
+                io.emit('leaderboard_update', { babak: 'final' }); // Update layar agar poin kembali ke 0
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "RESET BERHASIL: Seluruh permainan Final dihapus, dan poin kembali bersih menjadi 0!"
+            });
+        } catch (error) {
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    },
 };

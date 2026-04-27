@@ -31,5 +31,6 @@ router.post('/input-nilai-juri', adminController.inputNilaiJuri);
 router.post('/nilai-tambahan-semifinal', adminController.inputNilaiTambahanSemiFinal);
 
 router.post('/reset-semifinal-full', adminController.resetSemiFinalFull);
+router.post('/reset-final-full', adminController.resetFinalFull);
 
 export default router;
