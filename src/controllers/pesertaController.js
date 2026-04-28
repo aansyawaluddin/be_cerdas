@@ -78,7 +78,7 @@ export const pesertaController = {
                 if (totalPoin > 200) return res.status(400).json({ success: false, message: "Total poin melebihi batas 200!" });
             }
             else if (tim.tahapAktif === 'final') {
-                if (daftarTaruhan.length !== 20) return res.status(400).json({ success: false, message: "Harus tepat 20 soal!" });
+                if (daftarTaruhan.length < 1 || daftarTaruhan.length > 20) return res.status(400).json({ success: false, message: "Jumlah taruhan tidak valid!" });
                 for (const taruhan of daftarTaruhan) {
                     const poinInt = parseInt(taruhan.poin, 10);
                     if (isNaN(poinInt) || poinInt < 10 || poinInt > 50) return res.status(400).json({ success: false, message: "Poin harus angka 10-50!" });
