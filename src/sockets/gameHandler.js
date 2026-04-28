@@ -291,9 +291,6 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
             if (infoPaket && infoPaket.babak !== 'penyisihan') {
                 io.emit('paket_selesai', { message: "Ronde ini telah selesai. Sedang merekap poin..." });
-                if (infoPaket.babak === 'semi_final') {
-                    io.emit('semi_final_selesai', { message: "Babak Semi Final telah selesai!" });
-                }
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
             }
@@ -655,4 +652,4 @@ async function prosesEliminasiOtomatis(io, soalId) {
     } catch (error) {
         console.error("[ERROR ELIMINASI]:", error);
     }
-}   
+}

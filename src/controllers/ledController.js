@@ -8,6 +8,7 @@ export const ledController = {
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
             let sisaWaktu = gameState.sisaWaktu;
+            let isTanpaWaktu = false;
             let dataSoal = null;
             let daftarTim = [];
             let babakAktif = null;
@@ -32,15 +33,16 @@ export const ledController = {
                 babakAktif = soalAktif.paketSoal.babak;
                 paketNama = soalAktif.paketSoal.nama;
 
-                const isGame4Final = babakAktif === 'final' && (paketNama.toLowerCase().includes('game 4') || paketNama.toLowerCase().includes('case'));
-
-                if (isGame4Final) {
+                if (babakAktif === 'final' && (paketNama.toLowerCase().includes('game 4') || paketNama.toLowerCase().includes('case'))) {
                     sisaWaktu = 0;
-                } else if (gameState.soalAktifId === soalAktif.id) {
-                    sisaWaktu = gameState.sisaWaktu;
-                } else if (soalAktif.waktuMulai) {
-                    const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
+                    isTanpaWaktu = true;
+                } else {
+                    if (gameState.soalAktifId === soalAktif.id) {
+                        sisaWaktu = gameState.sisaWaktu;
+                    } else if (soalAktif.waktuMulai) {
+                        const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
+                        sisaWaktu = Math.max(0, DURASI - selisihDetik);
+                    }
                 }
 
                 const totalSoalSebelumnya = await prisma.soal.count({
@@ -98,7 +100,11 @@ export const ledController = {
             });
 
             const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
-            const daftarTimHasil = await prosesKlasemenUmum(teams, babakAktif);
+            let daftarTimHasil = await prosesKlasemenUmum(teams, babakAktif);
+
+            if (babakAktif === 'semi_final' && paketNama && paketNama.toLowerCase().includes('rebutan')) {
+                daftarTimHasil = daftarTimHasil.filter(tim => tim.isRebutan);
+            }
 
             daftarTim = daftarTimHasil.map(tim => {
                 const riwayatJawaban = soalAktif && tim.riwayat ? tim.riwayat[0] : null;
@@ -127,6 +133,7 @@ export const ledController = {
                     babakAktif: babakAktif,
                     soalAktif: dataSoal,
                     sisaWaktuDetik: sisaWaktu,
+                    isTanpaWaktu: isTanpaWaktu,
                     isPaused: gameState.isPaused,
                     timPencetBelId: gameState.timPencetBelId,
                     timBertanding: daftarTim
@@ -171,7 +178,14 @@ export const ledController = {
             const daftarTim = await prisma.tim.findMany({ where: filter, include: { skorBabak: true } });
 
             const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
-            const daftarTimHasil = await prosesKlasemenUmum(daftarTim, targetBabak);
+            let daftarTimHasil = await prosesKlasemenUmum(daftarTim, targetBabak);
+
+            if (targetBabak === 'semi_final' && gameState.paketAktifId) {
+                const paketAktif = await prisma.paketSoal.findUnique({ where: { id: parseInt(gameState.paketAktifId) } });
+                if (paketAktif && paketAktif.nama.toLowerCase().includes('rebutan')) {
+                    daftarTimHasil = daftarTimHasil.filter(tim => tim.isRebutan);
+                }
+            }
 
             const leaderboard = daftarTimHasil.map(tim => ({
                 id: tim.id,
