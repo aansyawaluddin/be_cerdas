@@ -359,10 +359,7 @@ export const pesertaController = {
 
             const daftarTim = await prisma.tim.findMany({
                 where: filterDaftarTim,
-                select: {
-                    id: true, nama: true, grup: true, fotoTim: true, isEliminated: true,
-                    skorBabak: { where: { babak: timSaya.tahapAktif }, select: { poin: true } }
-                }
+                include: { skorBabak: true }
             });
 
             const { prosesKlasemenUmum, getGameState } = await import('../sockets/gameHandler.js');

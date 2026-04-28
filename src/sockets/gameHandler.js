@@ -51,33 +51,27 @@ export const prosesKlasemenUmum = async (daftarTimAktif, babak) => {
 };
 
 export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
-    const semuaPaketSemi = await prisma.paketSoal.findMany({
-        where: { babak: 'semi_final' },
-        include: { daftarSoal: { select: { id: true } } }
-    });
-
-    const paketRebutan = semuaPaketSemi.filter(p => p.nama.toLowerCase().includes('rebutan'));
-    const soalRebutanIds = paketRebutan.flatMap(p => p.daftarSoal.map(s => s.id));
-
-    const riwayatRebutan = await prisma.riwayatJawaban.findMany({
-        where: { soalId: { in: soalRebutanIds }, isBenar: true }
-    });
-
     const timIds = daftarTimAktif.map(t => t.id);
-    const semuaRiwayat = await prisma.riwayatJawaban.findMany({
-        where: { timId: { in: timIds }, isBenar: true, soal: { paketSoal: { babak: 'semi_final' } } },
-        include: { soal: true }
+
+    const riwayatSemiFinal = await prisma.riwayatJawaban.findMany({
+        where: { timId: { in: timIds }, soal: { paketSoal: { babak: 'semi_final' } } },
+        include: { soal: { include: { paketSoal: true } } }
     });
 
     const mapped = daftarTimAktif.map(tim => {
         const skorObj = tim.skorBabak ? tim.skorBabak.find(s => s.babak === 'semi_final') : null;
         const poinTotal = skorObj ? skorObj.poin : (tim.poin || 0);
 
-        const poinRebutan = riwayatRebutan.filter(r => r.timId === tim.id).reduce((sum, r) => sum + r.poinDidapat, 0);
+        const riwayatTim = riwayatSemiFinal.filter(r => r.timId === tim.id);
+
+        const poinRebutan = riwayatTim
+            .filter(r => r.soal.paketSoal.nama.toLowerCase().includes('rebutan'))
+            .reduce((sum, r) => sum + r.poinDidapat, 0);
+
+        const poinMurni = poinTotal - poinRebutan;
 
         let totalWaktu = 0;
-        const riwayatTim = semuaRiwayat.filter(r => r.timId === tim.id);
-        riwayatTim.forEach(r => {
+        riwayatTim.filter(r => r.isBenar).forEach(r => {
             if (r.soal && r.soal.waktuMulai) {
                 const waktuPencet = r.waktuMenjawab || r.createdAt;
                 if (waktuPencet) {
@@ -86,8 +80,7 @@ export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
             }
         });
 
-        // poinMurni adalah poin sebelum ditambahkan rebutan
-        return { ...tim, poin: poinTotal, poinMurni: poinTotal - poinRebutan, totalWaktu };
+        return { ...tim, poin: poinTotal, poinMurni, poinRebutan, totalWaktu };
     });
 
     const klasemenMurni = [...mapped].sort((a, b) => {
@@ -95,30 +88,37 @@ export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
         return a.totalWaktu - b.totalWaktu;
     });
 
-    const rank6 = klasemenMurni[5];
-    const rank7 = klasemenMurni[6];
-
     let poinBatas = null;
-    if (rank6 && rank7 && rank6.poinMurni === rank7.poinMurni) {
-        poinBatas = rank6.poinMurni;
+    if (klasemenMurni.length > 6 && klasemenMurni[5].poinMurni === klasemenMurni[6].poinMurni) {
+        poinBatas = klasemenMurni[5].poinMurni;
     }
 
     mapped.sort((a, b) => {
         if (poinBatas !== null) {
             const isASafe = a.poinMurni > poinBatas;
             const isBSafe = b.poinMurni > poinBatas;
+            const isARebutan = a.poinMurni === poinBatas;
+            const isBRebutan = b.poinMurni === poinBatas;
 
             if (isASafe && !isBSafe) return -1;
             if (!isASafe && isBSafe) return 1;
+
+            if (isARebutan && !isASafe && !isBSafe && !isBRebutan) return -1;
+            if (!isARebutan && !isASafe && !isBSafe && isBRebutan) return 1;
+
+            if (isARebutan && isBRebutan) {
+                if (b.poinRebutan !== a.poinRebutan) return b.poinRebutan - a.poinRebutan;
+                return a.totalWaktu - b.totalWaktu;
+            }
         }
 
-        if (b.poin !== a.poin) return b.poin - a.poin;
+        if (b.poinMurni !== a.poinMurni) return b.poinMurni - a.poinMurni;
         return a.totalWaktu - b.totalWaktu;
     });
 
     return mapped.map(t => ({
         ...t,
-        isAman: poinBatas !== null && t.poinMurni > poinBatas,
+        isAman: poinBatas !== null ? (t.poinMurni > poinBatas) : (klasemenMurni.findIndex(k => k.id === t.id) < 6),
         isRebutan: poinBatas !== null && t.poinMurni === poinBatas
     }));
 };
