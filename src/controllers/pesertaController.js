@@ -349,16 +349,35 @@ export const pesertaController = {
             });
             if (!timSaya) return res.status(404).json({ success: false, message: "Tim tidak ditemukan" });
 
+            let filterDaftarTim = { role: 'peserta', grup: timSaya.grup };
+            if (timSaya.tahapAktif === 'semi_final') {
+                filterDaftarTim.skorBabak = { some: { babak: 'semi_final' } };
+            } else {
+                filterDaftarTim.tahapAktif = timSaya.tahapAktif;
+                filterDaftarTim.isEliminated = false;
+            }
+
             const daftarTim = await prisma.tim.findMany({
-                where: { role: 'peserta', tahapAktif: timSaya.tahapAktif, grup: timSaya.grup },
+                where: filterDaftarTim,
                 select: {
                     id: true, nama: true, grup: true, fotoTim: true, isEliminated: true,
                     skorBabak: { where: { babak: timSaya.tahapAktif }, select: { poin: true } }
                 }
             });
 
-            const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
-            const timDenganSkor = await prosesKlasemenUmum(daftarTim, timSaya.tahapAktif);
+            const { prosesKlasemenUmum, getGameState } = await import('../sockets/gameHandler.js');
+            let timDenganSkor = await prosesKlasemenUmum(daftarTim, timSaya.tahapAktif);
+
+            if (timSaya.tahapAktif === 'semi_final') {
+                const gameState = getGameState();
+                if (gameState.paketAktifId) {
+                    const pkt = await prisma.paketSoal.findUnique({ where: { id: parseInt(gameState.paketAktifId) } });
+                    if (pkt && pkt.nama.toLowerCase().includes('rebutan')) {
+                        const timRebutan = timDenganSkor.filter(t => t.isRebutan);
+                        if (timRebutan.length > 0) timDenganSkor = timRebutan;
+                    }
+                }
+            }
 
             const formattedData = timDenganSkor.map((tim, index) => ({
                 timId: tim.id,

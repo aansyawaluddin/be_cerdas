@@ -379,6 +379,7 @@ export const adminController = {
         try {
             const soalAktif = await prisma.soal.findFirst({ where: { status: 'aktif' }, include: { paketSoal: true } });
             let sisaWaktu = 0, targetBabak = 'penyisihan', targetGrup = null;
+            let isTanpaWaktu = false;
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
@@ -386,24 +387,25 @@ export const adminController = {
 
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
+                const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
+
+                if (targetBabak === 'final' && (namaPaket.includes('game 4') || namaPaket.includes('case'))) {
+                    sisaWaktu = 0;
+                    isTanpaWaktu = true;
+                } else {
+                    if (gameState.soalAktifId === soalAktif.id) {
+                        sisaWaktu = gameState.sisaWaktu;
+                    } else if (soalAktif.waktuMulai) {
+                        const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
+                        sisaWaktu = Math.max(0, DURASI - selisihDetik);
+                    }
+                }
 
                 if (targetBabak === 'penyisihan') {
-                    const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
                     if (namaPaket.includes('a')) targetGrup = 1;
                     else if (namaPaket.includes('b')) targetGrup = 2;
                     else if (namaPaket.includes('c')) targetGrup = 3;
                     else if (namaPaket.includes('d')) targetGrup = 4;
-                }
-
-                const isGame4Final = targetBabak === 'final' && (soalAktif.paketSoal.nama.toLowerCase().includes('game 4') || soalAktif.paketSoal.nama.toLowerCase().includes('case'));
-
-                if (isGame4Final) {
-                    sisaWaktu = 0;
-                } else if (gameState.soalAktifId === soalAktif.id) {
-                    sisaWaktu = gameState.sisaWaktu;
-                } else if (soalAktif.waktuMulai) {
-                    const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
 
                 dataSoalAdmin = {
@@ -431,13 +433,24 @@ export const adminController = {
                 }
             }
 
-            const aturanPencarian = { role: 'peserta', isEliminated: false, tahapAktif: targetBabak };
+            let aturanPencarian = { role: 'peserta' };
+            if (targetBabak === 'semi_final') {
+                aturanPencarian.skorBabak = { some: { babak: 'semi_final' } };
+            } else {
+                aturanPencarian.tahapAktif = targetBabak;
+                aturanPencarian.isEliminated = false;
+            }
             if (targetGrup !== null) aturanPencarian.grup = targetGrup;
 
             const teams = await prisma.tim.findMany({ where: aturanPencarian, include: { skorBabak: true } });
 
             const { prosesKlasemenUmum } = await import('../sockets/gameHandler.js');
-            const daftarTimHasil = await prosesKlasemenUmum(teams, targetBabak);
+            let daftarTimHasil = await prosesKlasemenUmum(teams, targetBabak);
+
+            if (targetBabak === 'semi_final' && dataSoalAdmin && dataSoalAdmin.paketNama.toLowerCase().includes('rebutan')) {
+                const timRebutan = daftarTimHasil.filter(tim => tim.isRebutan);
+                if (timRebutan.length > 0) daftarTimHasil = timRebutan;
+            }
 
             const leaderboard = daftarTimHasil.map(tim => ({ id: tim.id, nama: tim.nama, poin: tim.poin, isEliminated: tim.isEliminated }));
 
@@ -446,6 +459,7 @@ export const adminController = {
                 data: {
                     soalAktif: dataSoalAdmin,
                     sisaWaktuDetik: sisaWaktu,
+                    isTanpaWaktu: isTanpaWaktu,
                     faseAktif: gameState.faseAktif || 'idle',
                     isPaused: gameState.isPaused,
                     timPencetBelId: gameState.timPencetBelId,

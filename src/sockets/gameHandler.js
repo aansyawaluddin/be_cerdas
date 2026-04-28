@@ -51,11 +51,14 @@ export const prosesKlasemenUmum = async (daftarTimAktif, babak) => {
 };
 
 export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
-    const paketRebutan = await prisma.paketSoal.findFirst({
-        where: { babak: 'semi_final', nama: { contains: 'rebutan' } },
+    const semuaPaketSemi = await prisma.paketSoal.findMany({
+        where: { babak: 'semi_final' },
         include: { daftarSoal: { select: { id: true } } }
     });
-    const soalRebutanIds = paketRebutan ? paketRebutan.daftarSoal.map(s => s.id) : [];
+
+    const paketRebutan = semuaPaketSemi.filter(p => p.nama.toLowerCase().includes('rebutan'));
+    const soalRebutanIds = paketRebutan.flatMap(p => p.daftarSoal.map(s => s.id));
+
     const riwayatRebutan = await prisma.riwayatJawaban.findMany({
         where: { soalId: { in: soalRebutanIds }, isBenar: true }
     });
@@ -69,6 +72,7 @@ export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
     const mapped = daftarTimAktif.map(tim => {
         const skorObj = tim.skorBabak ? tim.skorBabak.find(s => s.babak === 'semi_final') : null;
         const poinTotal = skorObj ? skorObj.poin : (tim.poin || 0);
+
         const poinRebutan = riwayatRebutan.filter(r => r.timId === tim.id).reduce((sum, r) => sum + r.poinDidapat, 0);
 
         let totalWaktu = 0;
@@ -82,6 +86,7 @@ export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
             }
         });
 
+        // poinMurni adalah poin sebelum ditambahkan rebutan
         return { ...tim, poin: poinTotal, poinMurni: poinTotal - poinRebutan, totalWaktu };
     });
 
@@ -102,9 +107,11 @@ export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
         if (poinBatas !== null) {
             const isASafe = a.poinMurni > poinBatas;
             const isBSafe = b.poinMurni > poinBatas;
+
             if (isASafe && !isBSafe) return -1;
             if (!isASafe && isBSafe) return 1;
         }
+
         if (b.poin !== a.poin) return b.poin - a.poin;
         return a.totalWaktu - b.totalWaktu;
     });

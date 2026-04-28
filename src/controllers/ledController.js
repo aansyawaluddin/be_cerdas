@@ -91,7 +91,13 @@ export const ledController = {
                 else if (/\b(b|2)\b/.test(namaP)) targetGrup = 2;
             }
 
-            const filterTim = { role: 'peserta', tahapAktif: babakAktif };
+            let filterTim = { role: 'peserta' };
+            if (babakAktif === 'semi_final') {
+                filterTim.skorBabak = { some: { babak: 'semi_final' } };
+            } else {
+                filterTim.tahapAktif = babakAktif;
+                filterTim.isEliminated = false;
+            }
             if (targetGrup !== null) filterTim.grup = targetGrup;
 
             const teams = await prisma.tim.findMany({
@@ -103,7 +109,8 @@ export const ledController = {
             let daftarTimHasil = await prosesKlasemenUmum(teams, babakAktif);
 
             if (babakAktif === 'semi_final' && paketNama && paketNama.toLowerCase().includes('rebutan')) {
-                daftarTimHasil = daftarTimHasil.filter(tim => tim.isRebutan);
+                const timRebutan = daftarTimHasil.filter(tim => tim.isRebutan);
+                if (timRebutan.length > 0) daftarTimHasil = timRebutan;
             }
 
             daftarTim = daftarTimHasil.map(tim => {
@@ -172,7 +179,13 @@ export const ledController = {
                 });
             }
 
-            const filter = { role: 'peserta', tahapAktif: targetBabak };
+            let filter = { role: 'peserta' };
+            if (targetBabak === 'semi_final') {
+                filter.skorBabak = { some: { babak: 'semi_final' } };
+            } else {
+                filter.tahapAktif = targetBabak;
+                filter.isEliminated = false;
+            }
             if (targetGrup !== null) filter.grup = targetGrup;
 
             const daftarTim = await prisma.tim.findMany({ where: filter, include: { skorBabak: true } });
@@ -183,7 +196,8 @@ export const ledController = {
             if (targetBabak === 'semi_final' && gameState.paketAktifId) {
                 const paketAktif = await prisma.paketSoal.findUnique({ where: { id: parseInt(gameState.paketAktifId) } });
                 if (paketAktif && paketAktif.nama.toLowerCase().includes('rebutan')) {
-                    daftarTimHasil = daftarTimHasil.filter(tim => tim.isRebutan);
+                    const timRebutan = daftarTimHasil.filter(tim => tim.isRebutan);
+                    if (timRebutan.length > 0) daftarTimHasil = timRebutan;
                 }
             }
 
