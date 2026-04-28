@@ -378,24 +378,31 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
         } else {
             faseAktif = 'soal';
-            sisaWaktu = DURASI;
-            io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu });
+            const isGame4Final = infoPaket.babak === 'final' && (namaPaketL.includes('game 4') || namaPaketL.includes('case'));
+            sisaWaktu = isGame4Final ? 0 : DURASI;
+
+            io.emit('game_mulai', { soalId: soalAktifId, sisaWaktu, isUnlimited: isGame4Final });
 
             if (timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(async () => {
-                if (isPaused) return;
-                sisaWaktu--;
-                io.emit('timer_update', { sisaWaktu, fase: 'soal' });
 
-                if (sisaWaktu <= 0) {
-                    clearInterval(timerInterval);
-                    await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
-                    await hukumTimTidakMenjawab(io, soalAktifId);
-                    io.emit('waktu_habis', { soalId: soalAktifId });
-                    await prosesEliminasiOtomatis(io, soalAktifId);
-                    await triggerAutoNext(io, paketId);
-                }
-            }, 1000);
+            if (isGame4Final) {
+                console.log(`[GAME] Final Case Battle (Game 4) dimulai tanpa timer otomatis. Menunggu aksi admin...`);
+            } else {
+                timerInterval = setInterval(async () => {
+                    if (isPaused) return;
+                    sisaWaktu--;
+                    io.emit('timer_update', { sisaWaktu, fase: 'soal' });
+
+                    if (sisaWaktu <= 0) {
+                        clearInterval(timerInterval);
+                        await prisma.soal.update({ where: { id: soalAktifId }, data: { status: 'selesai' } });
+                        await hukumTimTidakMenjawab(io, soalAktifId);
+                        io.emit('waktu_habis', { soalId: soalAktifId });
+                        await prosesEliminasiOtomatis(io, soalAktifId);
+                        await triggerAutoNext(io, paketId);
+                    }
+                }, 1000);
+            }
         }
         return soalAktif;
     } catch (error) {
@@ -648,4 +655,4 @@ async function prosesEliminasiOtomatis(io, soalId) {
     } catch (error) {
         console.error("[ERROR ELIMINASI]:", error);
     }
-}
+}   

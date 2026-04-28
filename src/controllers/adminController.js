@@ -386,18 +386,24 @@ export const adminController = {
 
             if (soalAktif) {
                 targetBabak = soalAktif.paketSoal.babak;
-                if (gameState.soalAktifId === soalAktif.id) {
-                    sisaWaktu = gameState.sisaWaktu;
-                } else if (soalAktif.waktuMulai) {
-                    const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
-                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
-                }
+
                 if (targetBabak === 'penyisihan') {
                     const namaPaket = soalAktif.paketSoal.nama.toLowerCase();
                     if (namaPaket.includes('a')) targetGrup = 1;
                     else if (namaPaket.includes('b')) targetGrup = 2;
                     else if (namaPaket.includes('c')) targetGrup = 3;
                     else if (namaPaket.includes('d')) targetGrup = 4;
+                }
+
+                const isGame4Final = targetBabak === 'final' && (soalAktif.paketSoal.nama.toLowerCase().includes('game 4') || soalAktif.paketSoal.nama.toLowerCase().includes('case'));
+
+                if (isGame4Final) {
+                    sisaWaktu = 0;
+                } else if (gameState.soalAktifId === soalAktif.id) {
+                    sisaWaktu = gameState.sisaWaktu;
+                } else if (soalAktif.waktuMulai) {
+                    const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
+                    sisaWaktu = Math.max(0, DURASI - selisihDetik);
                 }
 
                 dataSoalAdmin = {

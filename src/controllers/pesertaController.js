@@ -117,7 +117,11 @@ export const pesertaController = {
             const gameState = getGameState();
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
 
-            if (gameState.soalAktifId === soalAktif.id) {
+            const isGame4Final = soalAktif.paketSoal.babak === 'final' && (soalAktif.paketSoal.nama.toLowerCase().includes('game 4') || soalAktif.paketSoal.nama.toLowerCase().includes('case'));
+
+            if (isGame4Final) {
+                sisaWaktu = 0;
+            } else if (gameState.soalAktifId === soalAktif.id) {
                 sisaWaktu = gameState.sisaWaktu;
             } else {
                 sisaWaktu = Math.max(0, DURASI - Math.floor((new Date().getTime() - soalAktif.waktuMulai?.getTime()) / 1000));

@@ -32,7 +32,11 @@ export const ledController = {
                 babakAktif = soalAktif.paketSoal.babak;
                 paketNama = soalAktif.paketSoal.nama;
 
-                if (gameState.soalAktifId === soalAktif.id) {
+                const isGame4Final = babakAktif === 'final' && (paketNama.toLowerCase().includes('game 4') || paketNama.toLowerCase().includes('case'));
+
+                if (isGame4Final) {
+                    sisaWaktu = 0;
+                } else if (gameState.soalAktifId === soalAktif.id) {
                     sisaWaktu = gameState.sisaWaktu;
                 } else if (soalAktif.waktuMulai) {
                     const selisihDetik = Math.floor((new Date().getTime() - soalAktif.waktuMulai.getTime()) / 1000);
