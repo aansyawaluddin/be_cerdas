@@ -513,7 +513,10 @@ export const lanjutSoalBerikutnya = async (io) => {
         await prosesEliminasiOtomatis(io, soalAktifId);
     }
 
-    if (paket.babak === 'semi_final' && !paket.nama.toLowerCase().includes('rebutan')) {
+    const isSemiFinalReguler = paket.babak === 'semi_final' && !namaPaketL.includes('rebutan');
+    const isFinalGame2 = paket.babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle'));
+
+    if (isSemiFinalReguler || isFinalGame2) {
         const jumlahSelesai = await prisma.soal.count({
             where: { paketSoalId: parseInt(paketAktifId), status: 'selesai' }
         });

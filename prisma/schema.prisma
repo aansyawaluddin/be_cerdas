@@ -17,6 +17,14 @@ enum KategoriSoal {
   b_inggris
   mtk
   ipa
+  pkn
+  geografi
+  sejarah
+  sosiologi
+  ekonomi
+  penalaran_umum
+  pengetahuan_kuantitatif
+  agama
 }
 
 enum TipeSoal {
