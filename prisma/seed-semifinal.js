@@ -5,7 +5,6 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🧹 Membersihkan data Paket Soal dan Soal lama (HANYA BABAK SEMI FINAL)...');
 
-    // Hapus data Semi Final lama agar tidak duplikat
     const paketSemiFinalLama = await prisma.paketSoal.findMany({ where: { babak: 'semi_final' } });
     const idPaketSemi = paketSemiFinalLama.map(p => p.id);
 
@@ -16,9 +15,7 @@ async function main() {
 
     console.log('✨ Data Semi Final bersih! Memulai seeding...');
 
-    // ==========================================
-    // 1. BUAT PAKET UTAMA (50 SOAL SEKALIGUS)
-    // ==========================================
+
     const paketUtama = await prisma.paketSoal.create({
         data: { nama: "Semi Final", babak: 'semi_final' }
     });

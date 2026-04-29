@@ -5,15 +5,11 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🧹 Membersihkan data Paket Soal dan Soal lama...');
 
-    // Hapus data lama agar tidak duplikat
     await prisma.soal.deleteMany({});
     await prisma.paketSoal.deleteMany({});
 
     console.log('✨ Database bersih! Memulai seeding Bank Soal Penyisihan...');
 
-    // ==========================================
-    // 1. DATA SOAL PENYISIHAN (35 SOAL ASLI)
-    // ==========================================
     const soalPenyisihanAsli = [
         { pertanyaan: "Besaran pokok dalam SI adalah…", kategori: "ipa", opsi: ["Kecepatan", "Massa", "Gaya", "Energi"], jawaban: "Massa" },
         { pertanyaan: "Sinonim dari kata “cerdas” adalah…", kategori: "b_indo", opsi: ["Bodoh", "Pintar", "Malas", "Lambat"], jawaban: "Pintar" },
@@ -52,9 +48,7 @@ async function main() {
         { pertanyaan: "What is the meaning of “beautiful”?", kategori: "b_inggris", opsi: ["Buruk", "Cepat", "Indah", "Besar"], jawaban: "Indah" }
     ];
 
-    // ==========================================
-    // 2. MEMBUAT PAKET A & PAKET B (BABAK PENYISIHAN)
-    // ==========================================
+
     console.log("⏳ Memulai proses seeding data Paket Penyisihan...");
     const namaPaketPenyisihan = ['Paket A', 'Paket B'];
 
@@ -68,7 +62,6 @@ async function main() {
 
         console.log(`✅ [${paketPenyisihan.nama}] berhasil dibuat.`);
 
-        // Petakan data soal agar sesuai dengan format Prisma
         const dataInsertPenyisihan = soalPenyisihanAsli.map(soal => ({
             pertanyaan: soal.pertanyaan,
             kategori: soal.kategori,
