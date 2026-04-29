@@ -156,8 +156,8 @@ export const adminController = {
                 for (const tim of timFinal) {
                     await tx.skorBabak.upsert({
                         where: { timId_babak: { timId: tim.id, babak: 'final' } },
-                        update: { poin: { increment: 1000 } },
-                        create: { timId: tim.id, babak: 'final', poin: 1000 }
+                        update: { poin: { increment: 400 } },
+                        create: { timId: tim.id, babak: 'final', poin: 400 }
                     });
                 }
             });
@@ -169,7 +169,7 @@ export const adminController = {
 
             return res.status(200).json({
                 success: true,
-                message: `Berhasil! Modal 1000 poin telah ditambahkan kepada ${timFinal.length} tim Finalis untuk modal Game 2.`,
+                message: `Berhasil! Modal 400 poin telah ditambahkan kepada ${timFinal.length} tim Finalis untuk modal Game 2.`,
                 data: timFinal.map(t => ({ id: t.id, nama: t.nama }))
             });
         } catch (error) {
