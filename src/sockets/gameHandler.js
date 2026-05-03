@@ -304,20 +304,7 @@ export const mulaiSiklusPaket = async (io, paketId) => {
             return null;
         }
 
-        const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
-        const namaPaketL = infoPaket.nama.toLowerCase();
-
-        let poolSoal = soalBelum;
-
-        if (infoPaket.babak === 'semi_final' && !namaPaketL.includes('rebutan')) {
-            poolSoal = soalBelum.slice(0, 10);
-        }
-        else if (infoPaket.babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle'))) {
-            poolSoal = soalBelum.slice(0, 20);
-        }
-
-        const randomIndex = Math.floor(Math.random() * poolSoal.length);
-        const soalBerikutnya = poolSoal[randomIndex];
+        const soalBerikutnya = soalBelum[0];
 
         const soalAktif = await prisma.soal.update({
             where: { id: soalBerikutnya.id },
@@ -513,10 +500,7 @@ export const lanjutSoalBerikutnya = async (io) => {
         await prosesEliminasiOtomatis(io, soalAktifId);
     }
 
-    const isSemiFinalReguler = paket.babak === 'semi_final' && !namaPaketL.includes('rebutan');
-    const isFinalGame2 = paket.babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle'));
-
-    if (isSemiFinalReguler || isFinalGame2) {
+    if (paket.babak === 'semi_final' && !paket.nama.toLowerCase().includes('rebutan')) {
         const jumlahSelesai = await prisma.soal.count({
             where: { paketSoalId: parseInt(paketAktifId), status: 'selesai' }
         });
