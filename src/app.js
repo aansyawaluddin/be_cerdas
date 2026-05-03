@@ -30,6 +30,12 @@ app.set('io', io);
 
 gameSocketHandler(io);
 
+io.on('connection', (socket) => {
+    socket.on('admin:isu_update', (data) => {
+        io.emit('game4_isu_update', { isuIndex: data.isuIndex ?? 0 });
+    });
+});
+
 app.use('/uploads', express.static('public/uploads'));
 
 app.use('/api/auth', authRoutes);

@@ -446,6 +446,11 @@ export const getGameState = () => {
     return { isPaused, sisaWaktu, soalAktifId, paketAktifId, faseAktif, timPencetBelId };
 };
 
+export const resetBelSaja = (io, lockedTimId) => {
+    timPencetBelId = null;
+    io.emit('bel_reset', { lockedTimId: lockedTimId ?? null });
+};
+
 export const lanjutSoalBerikutnya = async (io) => {
     if (!paketAktifId) throw new Error("Tidak ada paket soal yang aktif saat ini.");
 

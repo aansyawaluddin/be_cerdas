@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { mulaiSiklusPaket, mulaiFaseStrategi, togglePause, forceStopTimer, getGameState, lanjutSoalBerikutnya } from '../sockets/gameHandler.js';
+import { mulaiSiklusPaket, mulaiFaseStrategi, togglePause, forceStopTimer, getGameState, lanjutSoalBerikutnya, resetBelSaja } from '../sockets/gameHandler.js';
 import prisma from '../utils/prisma.js';
 
 export const adminController = {
@@ -541,6 +541,18 @@ export const adminController = {
             return res.status(200).json({ success: true, message: "Soal berhasil ditutup." });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
+        }
+    },
+
+    belReset: async (req, res) => {
+        try {
+            const io = req.app.get('io');
+            if (!io) return res.status(500).json({ success: false, message: "Socket belum siap." });
+            const { lockedTimId } = req.body;
+            resetBelSaja(io, lockedTimId ?? null);
+            return res.json({ success: true, message: 'Bell reset.' });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: error.message });
         }
     }
 };

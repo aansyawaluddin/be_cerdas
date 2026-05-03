@@ -33,4 +33,6 @@ router.post('/nilai-tambahan-semifinal', adminController.inputNilaiTambahanSemiF
 router.post('/reset-semifinal-full', adminController.resetSemiFinalFull);
 router.post('/reset-final-full', adminController.resetFinalFull);
 
+router.post('/bel-reset', adminController.belReset);
+
 export default router;
