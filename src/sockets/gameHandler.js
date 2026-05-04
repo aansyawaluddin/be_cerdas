@@ -282,6 +282,10 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         isPaused = false;
         timPencetBelId = null;
 
+        const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
+        if (!infoPaket) return null;
+        const namaPaketL = infoPaket.nama.toLowerCase();
+
         await prisma.soal.updateMany({
             where: { status: 'aktif' },
             data: { status: 'selesai' }
@@ -294,9 +298,8 @@ export const mulaiSiklusPaket = async (io, paketId) => {
 
         if (soalBelum.length === 0) {
             console.log(`[GAME] Paket ${paketId} Selesai.`);
-            const infoPaket = await prisma.paketSoal.findUnique({ where: { id: parseInt(paketId) } });
 
-            if (infoPaket && infoPaket.babak !== 'penyisihan') {
+            if (infoPaket.babak !== 'penyisihan') {
                 io.emit('paket_selesai', { message: "Ronde ini telah selesai. Sedang merekap poin..." });
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
