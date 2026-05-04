@@ -2,55 +2,70 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+function shuffleArray(array) {
+    let currentIndex = array.length, randomIndex;
+    while (currentIndex !== 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    return array;
+}
+
 async function main() {
     console.log('🧹 Membersihkan data Paket Soal dan Soal lama...');
 
     await prisma.soal.deleteMany({});
     await prisma.paketSoal.deleteMany({});
 
-    console.log('✨ Database bersih! Memulai seeding Bank Soal Penyisihan...');
+    console.log('✨ Database bersih! Memulai seeding 35 Bank Soal Penyisihan (Diformat & Diacak)...');
 
     const soalPenyisihanAsli = [
-        { pertanyaan: "Besaran pokok dalam SI adalah…", kategori: "ipa", opsi: ["Kecepatan", "Massa", "Gaya", "Energi"], jawaban: "Massa" },
-        { pertanyaan: "Sinonim dari kata “cerdas” adalah…", kategori: "b_indo", opsi: ["Bodoh", "Pintar", "Malas", "Lambat"], jawaban: "Pintar" },
-        { pertanyaan: "Benua terbesar di dunia adalah…", kategori: "ipa", opsi: ["Afrika", "Asia", "Amerika", "Eropa"], jawaban: "Asia" },
-        { pertanyaan: "2, 4, 8, 16, …", kategori: "mtk", opsi: ["18", "24", "32", "64"], jawaban: "32" },
-        { pertanyaan: "Bus kota A, B, C, D, E dan F siap diberangkatkan. Bus A dan F dari perusahaan Habi. Bus E dan B dari perusahaan GreenBird. C dan D dari perusahaan Grob. Setiap jam hanya dua perusahaan yang boleh memberangkatkan bus. Maka, kemungkinan bus yang diberangkatkan bersamaan dalam satu jam adalah ….", kategori: "mtk", opsi: ["A, D, B, F", "D, C, E, A", "E, A, B, F", "E, A, F, C", "F, D, B, A"], jawaban: "D, C, E, A" },
-        { pertanyaan: "Kata “berlari” termasuk…", kategori: "b_indo", opsi: ["Nomina", "Verba", "Adjektiva", "Konjungsi"], jawaban: "Verba" },
-        { pertanyaan: "Pada suatu jamuan makan malam 8 orang eksekutif muda (Aga, Didi, Lala, Laura, Gael, Michael, Rani, dan Togi) duduk mengelilingi satu meja bundar. Gael duduk berseberangan dengan Aga. Michael duduk diantara Togi dan Lala. Laura dan Lala tepat duduk berhadapan. Togi duduk 2 kursi terpisah dari Aga. Bila Michael dan Rani duduk berseberangan pernyataan di bawah ini yang benar adalah…", kategori: "b_indo", opsi: ["Gael duduk berhadapan dengan Didi.", "Gael duduk di sebelah Michael.", "Lala duduk di sebelah Didi", "Didi duduk di antara Aga dan Lala"], jawaban: "Didi duduk di antara Aga dan Lala" },
-        { pertanyaan: "Empat pecatur : A, B, C, dan D, bertanding dalam suatu turnamen catur. Setiap pemain saling bertemu satu kali. Dalam setiap pertandingan, pemain yang menang, seri, dan, kalah, berturut-turut mendapatkan nilai 2, 1, dan 0. Data hasil pertandingan adalah A menang dua kali, B seri dua kali, C kalah dua kali, dan D tidak pernah seri. Jika B kalah melawan D, maka ....", kategori: "mtk", opsi: ["A juara kedua", "B juara kedua", "C juara kedua", "D juara kedua"], jawaban: "B juara kedua" },
-        { pertanyaan: "pH < 7 bersifat…", kategori: "ipa", opsi: ["Basa", "Netral", "Asam", "Garam"], jawaban: "Asam" },
-        { pertanyaan: "Interaksi sosial terjadi jika ada…", kategori: "b_indo", opsi: ["Individu saja", "Kontak dan komunikasi", "Kelompok saja", "Konflik"], jawaban: "Kontak dan komunikasi" },
-        { pertanyaan: "41 37 35 35 31 29 29 …", kategori: "mtk", opsi: ["33", "31", "25", "29"], jawaban: "25" },
-        { pertanyaan: "Kata baku dari “aktifitas”…", kategori: "b_indo", opsi: ["Aktifitas", "Aktivitas", "Aktifitasan", "Aktiv"], jawaban: "Aktivitas" },
-        { pertanyaan: "A F G L M R S…", kategori: "mtk", opsi: ["Z", "Y", "X", "U"], jawaban: "X" },
-        { pertanyaan: "Saat terluka, hewan seperti anjing atau kucing akan menjilati lukanya hingga sembuh. Air liur hewan memang mengandung senyawa antiseptik yang dapat membasmi bakteri. Jika begitu, bagaimana dengan air liur manusia? Ternyata air liur manusia sedikit berbeda dengan air liur hewan. Walau tidak bisa langsung menyembuhkan, air liur manusia bisa dimanfaatkan untuk perawatan luka. Manakah pernyataan berikut yang MELEMAHKAN informasi pada teks di atas?", kategori: "b_indo", opsi: ["Penggunaan air liur manusia terhadap luka justru berbahaya karena mengandung bakteri yang tidak diketahui.", "Air liur manusia mengandung histatin yang bersifat antimikroba sehingga dapat menghalau infeksi.", "Terdapat beberapa syarat penerapan agar air liur manusia dapat membantu merawat luka.", "Pada air liur hewan terdapat kandungan epidermal growth factor yang berperan penting dalam penyembuhan luka."], jawaban: "Penggunaan air liur manusia terhadap luka justru berbahaya karena mengandung bakteri yang tidak diketahui." },
-        { pertanyaan: "Hukum Newton I adalah hukum…", kategori: "ipa", opsi: ["Aksi reaksi", "Inersia", "Percepatan", "Gravitasi"], jawaban: "Inersia" },
-        { pertanyaan: "Mata uang Jepang adalah…", kategori: "b_indo", opsi: ["Yuan", "Yen", "Won", "Dollar"], jawaban: "Yen" },
-        { pertanyaan: "Kalimat efektif adalah…", kategori: "b_indo", opsi: ["Saya pergi ke pasar dan saya membeli sayur", "Saya ke pasar membeli sayur", "Saya pergi ke pasar untuk membeli sayur", "Saya pergi pasar beli sayur"], jawaban: "Saya pergi ke pasar untuk membeli sayur" },
-        { pertanyaan: "Energi kinetik dipengaruhi oleh…", kategori: "ipa", opsi: ["Massa dan kecepatan", "Massa dan suhu", "Volume dan massa", "Tekanan dan volume"], jawaban: "Massa dan kecepatan" },
-        { pertanyaan: "Guru A menyatakan bahwa nilai mata pelajaran sejarah murid kelas XI semester 2 meningkat setelah dimanfaatkannya museum sebagai salah satu sumber belajar. Manakah pernyataan di bawah ini, yang jika benar, akan memperkuat argumen guru A di atas?", kategori: "b_indo", opsi: ["Kenaikan nilai tidak hanya terjadi pada mata pelajaran sejarah.", "Pemanfaatan museum adalah metode terbaik untuk belajar sejarah.", "Keberhasilan peningkatan nilai mata pelajaran sejarah telah terjadi di kelas XI semester 1.", "Museum adalah tempat terbaik untuk belajar"], jawaban: "Pemanfaatan museum adalah metode terbaik untuk belajar sejarah." },
-        { pertanyaan: "ASEAN berdiri tahun…", kategori: "b_indo", opsi: ["1965", "1967", "1970", "1975"], jawaban: "1967" },
-        { pertanyaan: "Sebuah benda bermassa 2 kg dipercepat 2 m/s². Besar gaya yang bekerja adalah…", kategori: "ipa", opsi: ["2 N", "3 N", "4 N", "6 N"], jawaban: "4 N" },
-        { pertanyaan: "Usaha yang dilakukan gaya 5 N untuk memindahkan benda sejauh 4 m adalah…", kategori: "ipa", opsi: ["10 J", "15 J", "20 J", "25 J"], jawaban: "20 J" },
-        { pertanyaan: "Massa jenis benda jika massanya 100 g dan volumenya 50 cm³ adalah…", kategori: "ipa", opsi: ["1 g/cm³", "2 g/cm³", "3 g/cm³", "4 g/cm³"], jawaban: "2 g/cm³" },
-        { pertanyaan: "Energi potensial benda bermassa 1 kg pada ketinggian 5 m (g = 10 m/s²) adalah…", kategori: "ipa", opsi: ["25 J", "50 J", "75 J", "100 J"], jawaban: "50 J" },
-        { pertanyaan: "Jika arus listrik 2 A mengalir selama 3 detik, maka muatan listriknya adalah…", kategori: "ipa", opsi: ["4 C", "5 C", "6 C", "8 C"], jawaban: "6 C" },
-        { pertanyaan: "Sistem ekonomi Indonesia…", kategori: "b_indo", opsi: ["Liberal", "Sosialis", "Campuran", "Tradisional"], jawaban: "Campuran" },
-        { pertanyaan: "Tanda kalimat tanya…", kategori: "b_indo", opsi: ["Titik", "Koma", "?", "Titik dua"], jawaban: "?" },
-        { pertanyaan: "Jika semua A adalah B dan B adalah C…", kategori: "mtk", opsi: ["Semua A adalah C", "Semua C adalah A", "Sebagian A bukan C", "Tidak diketahui"], jawaban: "Semua A adalah C" },
-        { pertanyaan: "Fotosintesis membutuhkan…", kategori: "ipa", opsi: ["Oksigen", "Karbon dioksida dan cahaya", "Nitrogen", "Air saja"], jawaban: "Karbon dioksida dan cahaya" },
-        { pertanyaan: "Distribusi adalah…", kategori: "b_indo", opsi: ["Produksi", "Penyaluran barang", "Konsumsi", "Pembelian"], jawaban: "Penyaluran barang" },
-        { pertanyaan: "Choose the correct synonym of “happy”.", kategori: "b_inggris", opsi: ["Sad", "Glad", "Angry", "Tired"], jawaban: "Glad" },
-        { pertanyaan: "Which sentence is grammatically correct?", kategori: "b_inggris", opsi: ["She go to school every day", "She goes to school every day", "She going to school every day", "She gone to school every day"], jawaban: "She goes to school every day" },
-        { pertanyaan: "What is the antonym of “difficult”?", kategori: "b_inggris", opsi: ["Hard", "Easy", "Complicated", "Tough"], jawaban: "Easy" },
-        { pertanyaan: "“I ___ a book right now.” (Present Continuous)", kategori: "b_inggris", opsi: ["read", "am reading", "reads", "reading"], jawaban: "am reading" },
-        { pertanyaan: "What is the meaning of “beautiful”?", kategori: "b_inggris", opsi: ["Buruk", "Cepat", "Indah", "Besar"], jawaban: "Indah" }
+        // --- MTK / PENGETAHUAN KUANTITATIF ---
+        { pertanyaan: "Dari angka 1, 2, 3, 4, 5, dan 6 akan dibentuk bilangan genap yang terdiri dari tiga angka berbeda.\n\nBanyaknya bilangan yang dapat dibentuk adalah...", kategori: "mtk", opsi: ["30", "45", "60", "90", "120"], jawaban: "60" },
+        { pertanyaan: "Tentukan nilai p jika diketahui:\n\nLimit x → 3 dari [(x² - 9) / (√(x² + 7) - 4)] = p", kategori: "mtk", opsi: ["4", "6", "8", "12", "16"], jawaban: "8" },
+        { pertanyaan: "Diketahui fungsi:\nf(x) = ax + b\n\nJika f(f(x)) = 4x + 9 dan a > 0, maka nilai dari a² + b² adalah...", kategori: "mtk", opsi: ["8", "13", "18", "25", "34"], jawaban: "13" },
+        { pertanyaan: "Sebuah pekerjaan dapat diselesaikan oleh Andi dalam 12 hari, sedangkan Budi dapat menyelesaikannya dalam 24 hari.\n\nJika mereka bekerja bersama-sama, pekerjaan tersebut akan selesai dalam waktu...", kategori: "mtk", opsi: ["6 hari", "8 hari", "10 hari", "12 hari", "18 hari"], jawaban: "8 hari" },
+        { pertanyaan: "Dalam kantong terdapat 5 bola merah dan 3 bola putih.\n\nJika diambil 2 bola sekaligus secara acak, peluang terambilnya dua bola merah adalah...", kategori: "mtk", opsi: ["5/14", "5/28", "10/28", "15/28", "20/28"], jawaban: "5/14" },
+        { pertanyaan: "Diketahui persamaan eksponen:\n3^(x² - 4x) = 1/27\n\nJumlah semua nilai x yang memenuhi persamaan tersebut adalah...", kategori: "mtk", opsi: ["-4", "-1", "2", "3", "4"], jawaban: "4" },
+        { pertanyaan: "Akar-akar persamaan kuadrat x² - 5x + 6 = 0 adalah p dan q.\n\nPersamaan kuadrat baru yang akar-akarnya (p+2) dan (q+2) adalah...", kategori: "mtk", opsi: ["x² - 9x + 20 = 0", "x² + 9x - 20 = 0", "x² - 9x - 20 = 0", "x² - 5x + 10 = 0", "x² - 7x + 12 = 0"], jawaban: "x² - 9x + 20 = 0" },
+        { pertanyaan: "Rata-rata nilai ujian 5 siswa adalah 80.\n\nJika nilai satu siswa tambahan dimasukkan, nilai rata-ratanya menjadi 82. Nilai siswa tambahan tersebut adalah...", kategori: "mtk", opsi: ["84", "88", "90", "92", "96"], jawaban: "92" },
+        { pertanyaan: "Suku ke-3 suatu barisan aritmetika adalah 9, dan suku ke-6 adalah 18.\n\nJumlah 10 suku pertama barisan tersebut adalah...", kategori: "mtk", opsi: ["135", "150", "165", "180", "195"], jawaban: "165" },
+        { pertanyaan: "Sebuah barang didiskon 20%, kemudian dari harga baru tersebut didiskon lagi sebesar 15%.\n\nTotal persentase diskon dari harga awal adalah...", kategori: "mtk", opsi: ["32%", "35%", "33%", "30%", "28%"], jawaban: "32%" },
+
+        // --- B. INDO / LITERASI & PENALARAN UMUM ---
+        { pertanyaan: "Premis 1: Jika jalanan macet, maka Budi terlambat sampai di kantor.\nPremis 2: Hari ini Budi tidak terlambat sampai di kantor.\n\nKesimpulan yang paling tepat adalah...", kategori: "b_indo", opsi: ["Jalanan macet.", "Budi berangkat lebih awal.", "Jalanan tidak macet.", "Budi naik kereta.", "Hari ini adalah libur."], jawaban: "Jalanan tidak macet." },
+        { pertanyaan: "Premis 1: Semua karyawan harus hadir dalam rapat rutin.\nPremis 2: Sebagian manajer adalah karyawan.\n\nKesimpulan yang paling tepat adalah...", kategori: "b_indo", opsi: ["Semua manajer harus hadir rapat.", "Semua yang hadir rapat adalah manajer.", "Sebagian manajer tidak hadir rapat.", "Sebagian manajer harus hadir dalam rapat rutin.", "Tidak ada manajer yang hadir rapat."], jawaban: "Sebagian manajer harus hadir dalam rapat rutin." },
+        { pertanyaan: "Penggunaan kalimat yang TIDAK efektif terdapat pada kalimat...", kategori: "b_indo", opsi: ["Pemerintah melakukan berbagai upaya menekan inflasi.", "Bagi semua mahasiswa yang mengambil kelas ini diharap berkumpul.", "Kenaikan harga BBM berdampak pada daya beli.", "Dalam rapat itu diputuskan anggaran akan dipotong.", "Kemajuan teknologi mengubah cara manusia berkomunikasi."], jawaban: "Bagi semua mahasiswa yang mengambil kelas ini diharap berkumpul." },
+        { pertanyaan: "Kata serapan yang penulisannya sesuai dengan PUEBI (Pedoman Umum Ejaan Bahasa Indonesia) adalah...", kategori: "b_indo", opsi: ["Standardisasi, frekuensi, kuitansi", "Standarisasi, frekwensi, kwitansi", "Standardisasi, frekwensi, kuitansi", "Standarisasi, frekuensi, kuitansi", "Standardisasi, frekuensi, kwitansi"], jawaban: "Standardisasi, frekuensi, kuitansi" },
+        { pertanyaan: "Dalam lomba balap karung didapatkan hasil sebagai berikut:\n- A mendahului B.\n- C berada di belakang D.\n- B berada di depan D.\n- E berada di depan A.\n\nUrutan juara 1 sampai 5 yang benar adalah...", kategori: "b_indo", opsi: ["E, A, B, D, C", "A, E, B, C, D", "E, B, A, D, C", "A, B, E, D, C", "E, A, D, B, C"], jawaban: "E, A, B, D, C" },
+        { pertanyaan: "Premis 1: Semua pahlawan tidak pernah korupsi.\nPremis 2: Semua guru adalah pahlawan.\n\nKesimpulannya...", kategori: "b_indo", opsi: ["Beberapa guru korupsi", "Semua yang korupsi bukan guru", "Semua guru tidak pernah korupsi", "Ada guru yang korupsi", "Semua pahlawan adalah guru"], jawaban: "Semua guru tidak pernah korupsi" },
+        { pertanyaan: "Perhatikan kalimat berikut:\n'Meskipun hujan turun dengan deras, tetapi Budi tetap berangkat ke sekolah.'\n\nPerbaikan yang tepat agar kalimat tersebut menjadi efektif adalah...", kategori: "b_indo", opsi: ["Menghilangkan kata 'Meskipun'", "Menghilangkan kata 'tetapi'", "Mengganti 'tetapi' dengan 'namun'", "Mengganti 'Meskipun' dengan 'Walaupun'", "Menambahkan koma setelah kata 'Budi'"], jawaban: "Menghilangkan kata 'tetapi'" },
+        { pertanyaan: "Hubungan kata BURUNG : TERBANG sejalan dengan analogi...", kategori: "b_indo", opsi: ["Ikan : Berenang", "Kucing : Mengeong", "Kuda : Rumput", "Ular : Melilit", "Katak : Kolam"], jawaban: "Ikan : Berenang" },
+        { pertanyaan: "Lengkapi analogi berikut!\n\nDOKTER : RESEP = ... : ...", kategori: "b_indo", opsi: ["Polisi : Pistol", "Hakim : Vonis", "Koki : Dapur", "Guru : Murid", "Pilot : Pesawat"], jawaban: "Hakim : Vonis" },
+        { pertanyaan: "Antonim dari kata SPORADIS adalah...", kategori: "b_indo", opsi: ["Jarang", "Sering", "Menyebar", "Berhenti", "Terpisah"], jawaban: "Sering" },
+        { pertanyaan: "Kata 'kritis' dalam kalimat 'Pasien itu dalam keadaan kritis' memiliki makna...", kategori: "b_indo", opsi: ["Tajam dalam menganalisis", "Kecaman", "Gawat", "Penting", "Mendesak"], jawaban: "Gawat" },
+        { pertanyaan: "Penulisan gelar akademik yang benar dan sesuai ejaan adalah...", kategori: "b_indo", opsi: ["Prof. Dr. Ir. H. Budi Santoso, M.Si.", "Prof, Dr. Ir. H. Budi Santoso, M,Si.", "Prof. Dr. Ir. H. Budi Santoso M.Si", "Prof. Dr, Ir, H. Budi Santoso, M.Si.", "Prof. Dr. Ir. H. Budi Santoso. M.Si."], jawaban: "Prof. Dr. Ir. H. Budi Santoso, M.Si." },
+        { pertanyaan: "Di bawah ini yang merupakan kalimat opini adalah...", kategori: "b_indo", opsi: ["Ibukota Indonesia saat ini adalah Jakarta.", "Air mendidih pada suhu 100 derajat Celcius.", "Belajar matematika itu sangat menyenangkan.", "Matahari terbit dari sebelah timur.", "Satu minggu terdiri dari tujuh hari."], jawaban: "Belajar matematika itu sangat menyenangkan." },
+        { pertanyaan: "Sinonim dari kata 'Sinergi' adalah...", kategori: "b_indo", opsi: ["Persaingan", "Kerja sama", "Pemisahan", "Benturan", "Pertahanan"], jawaban: "Kerja sama" },
+        { pertanyaan: "Makna kata 'mengakomodasi' yang paling tepat adalah...", kategori: "b_indo", opsi: ["Menolak permintaan", "Menyediakan sesuatu untuk memenuhi kebutuhan", "Mengambil alih kekuasaan", "Meninggalkan tanggung jawab", "Membiarkan sesuatu terjadi"], jawaban: "Menyediakan sesuatu untuk memenuhi kebutuhan" },
+
+        // --- B. INGGRIS / LITERASI B. INGGRIS ---
+        { pertanyaan: "The proliferation of misinformation on social media has exacerbated societal polarization.\n\n'Exacerbated' is closest in meaning to...", kategori: "b_inggris", opsi: ["Alleviated", "Worsened", "Mitigated", "Elucidated", "Vindicated"], jawaban: "Worsened" },
+        { pertanyaan: "If she had known about the severe traffic, she would have taken the train instead.\n\nThis means that...", kategori: "b_inggris", opsi: ["She knew about the traffic and took the train.", "She didn't know about the traffic and didn't take the train.", "She took the train because of the traffic.", "She knew about the traffic but drove anyway.", "The train was delayed."], jawaban: "She didn't know about the traffic and didn't take the train." },
+        { pertanyaan: "The study reveals a compelling correlation between sleep deprivation and cognitive decline.\n\n'Compelling' means...", kategori: "b_inggris", opsi: ["Boring", "Convincing", "Weak", "Irrelevant", "Confusing"], jawaban: "Convincing" },
+        { pertanyaan: "Not only ___ the exam, but she also got a fully-funded scholarship.", kategori: "b_inggris", opsi: ["she passed", "she did pass", "did she pass", "passed she", "does she pass"], jawaban: "did she pass" },
+        { pertanyaan: "Unless immediate action is taken to curb carbon emissions, the damage to the ecosystem will be irreversible.\n\nThe sentence implies...", kategori: "b_inggris", opsi: ["Action has already been taken.", "Emissions are currently low.", "Immediate action is necessary to prevent permanent damage.", "Irreversible damage is impossible.", "Carbon emissions are beneficial."], jawaban: "Immediate action is necessary to prevent permanent damage." },
+
+        // --- IPA / SAINTEK ---
+        { pertanyaan: "Sebuah balok bermassa 2 kg meluncur pada bidang miring licin (sudut 30° terhadap horizontal).\n\nJika g = 10 m/s², besar gaya normal yang dialami balok adalah...", kategori: "ipa", opsi: ["10 N", "10√3 N", "20 N", "20√3 N", "5 N"], jawaban: "10√3 N" },
+        { pertanyaan: "Sebanyak 5,85 gram NaCl (Mr = 58,5) dilarutkan dalam air hingga volume larutan menjadi 500 mL.\n\nMolaritas (konsentrasi) larutan tersebut adalah...", kategori: "ipa", opsi: ["0,05 M", "0,10 M", "0,20 M", "0,40 M", "0,50 M"], jawaban: "0,20 M" },
+        { pertanyaan: "Tahapan pada respirasi seluler aerob yang menghasilkan molekul ATP paling banyak terjadi pada...", kategori: "ipa", opsi: ["Glikolisis", "Dekarboksilasi Oksidatif", "Siklus Krebs", "Transpor Elektron", "Fermentasi"], jawaban: "Transpor Elektron" },
+        { pertanyaan: "Dua hambatan 4 ohm dan 6 ohm dirangkai paralel, lalu dihubungkan dengan baterai 12 V.\n\nKuat arus total yang mengalir pada rangkaian adalah...", kategori: "ipa", opsi: ["1 A", "2 A", "3 A", "4 A", "5 A"], jawaban: "5 A" },
+        { pertanyaan: "Berapakah pH larutan CH₃COOH 0,1 M (Ka = 10⁻⁵)?", kategori: "ipa", opsi: ["1", "2", "3", "4", "5"], jawaban: "3" }
     ];
 
-
-    console.log("⏳ Memulai proses seeding data Paket Penyisihan...");
-    const namaPaketPenyisihan = ['Paket A', 'Paket B'];
+    const namaPaketPenyisihan = ['Paket A - UTBK Lengkap', 'Paket B - UTBK Lengkap'];
 
     for (let p = 0; p < namaPaketPenyisihan.length; p++) {
         const paketPenyisihan = await prisma.paketSoal.create({
@@ -62,7 +77,10 @@ async function main() {
 
         console.log(`✅ [${paketPenyisihan.nama}] berhasil dibuat.`);
 
-        const dataInsertPenyisihan = soalPenyisihanAsli.map(soal => ({
+        // --- PROSES MENGACAK SOAL ---
+        const soalDiacak = shuffleArray([...soalPenyisihanAsli]);
+
+        const dataInsertPenyisihan = soalDiacak.map(soal => ({
             pertanyaan: soal.pertanyaan,
             kategori: soal.kategori,
             tipe: 'pilihan_ganda',
@@ -74,21 +92,11 @@ async function main() {
             paketSoalId: paketPenyisihan.id
         }));
 
-        await prisma.soal.createMany({
-            data: dataInsertPenyisihan
-        });
-
-        console.log(`   -> Berhasil memasukkan 35 soal ke dalam ${paketPenyisihan.nama}`);
+        await prisma.soal.createMany({ data: dataInsertPenyisihan });
+        console.log(`   -> Berhasil memasukkan ${dataInsertPenyisihan.length} soal UTBK ke dalam ${paketPenyisihan.nama} secara ACAK.`);
     }
 
-    console.log("\n🎉 Seeding Penyisihan selesai! Silakan jalankan simulasi Anda.");
+    console.log("\n🎉 Seeding Penyisihan 35 Soal (Urutan Acak & Diformat) selesai!");
 }
 
-main()
-    .catch((e) => {
-        console.error('❌ Terjadi kesalahan saat seeding Soal:', e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+main().catch(console.error).finally(() => prisma.$disconnect());

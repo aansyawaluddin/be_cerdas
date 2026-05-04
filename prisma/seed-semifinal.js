@@ -2,6 +2,16 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+function shuffleArray(array) {
+    let currentIndex = array.length, randomIndex;
+    while (currentIndex !== 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    return array;
+}
+
 async function main() {
     console.log('🧹 Membersihkan data Paket Soal dan Soal lama (HANYA BABAK SEMI FINAL)...');
 
@@ -13,98 +23,89 @@ async function main() {
         await prisma.paketSoal.deleteMany({ where: { id: { in: idPaketSemi } } });
     }
 
-    console.log('✨ Data Semi Final bersih! Memulai seeding...');
+    console.log('✨ Data Semi Final bersih! Memulai seeding soal baru (Diacak & Diformat)...');
 
+    // ==========================================
+    // 1. BUAT PAKET UTAMA SEMI FINAL
+    // ==========================================
     const paketUtama = await prisma.paketSoal.create({
-        data: { nama: "Semi Final", babak: 'semi_final' }
+        data: { nama: "Semi Final - UTBK Baru", babak: 'semi_final' }
     });
     console.log(`✅ Paket dibuat: [ID: ${paketUtama.id}] ${paketUtama.nama}`);
 
     const daftar50Soal = [
-        // --- B. INDONESIA ---
-        { pertanyaan: "Film ini bercerita tentang seorang anak yang terpisah dari keluarganya dan harus berjuang hidup sendiri di Tengah kota besar.\nPetualangan dan pertemuan dengan orang-orang baru mengubah cara pandangnya terhadap hidup.\nKutipan tersebut merupakan bagian struktur teks resensi, yaitu", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["pendahuluan", "keunggulan", "sinopsis", "kelemahan", "penutup"], jawaban: "sinopsis" },
-        { pertanyaan: "Polusi udara di kota-kota besar makin mengkhawatirkan. Banyak kendaraan bermotor yang mengeluarkan asap tebal dan mencemari lingkungan.\nSelain itu, asap dari pabrik-pabrik juga ikut menyumbang buruknya kualitas udara. Akibatnya, banyak masyarakat yang terserang penyakit saluran pernapasan.\nBerdasarkan letak kalimat utamanya, teks tersebut termasuk jenis paragraf", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["deduktif", "induktif", "ineratif", "naratif", "campuran"], jawaban: "deduktif" },
-        { pertanyaan: "Sementara itu, warga tetap beraktivitas dan kegiatan dengan menggunakan masker.\nPerbaikan kalimat yang tepat untuk kalimat tersebut adalah", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Sementara itu, warga tetap beraktivitas dan giat dengan menggunakan masker.", "Sementara itu, warga tetap beraktivitas dan berkegiatan dengan menggunakan masker.", "Sementara itu, warga tetap aktivitas dan berkegiatan dengan menggunakan masker.", "Sementara itu, warga tetap aktivitas dan digiatkan dengan menggubakan masker.", "Sementara itu, wara tetap beraktivitas dan menggiati dengan menggunakan masker."], jawaban: "Sementara itu, warga tetap beraktivitas dan berkegiatan dengan menggunakan masker." },
+        // --- LITERASI B. INDONESIA ---
+        { pertanyaan: "Kata 'mitigasi' dalam kalimat berikut memiliki makna...\n\n'Pemerintah daerah melakukan mitigasi bencana menjelang musim hujan.'", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Pencegahan", "Penanggulangan dampak", "Pengurangan risiko", "Pemulihan keadaan", "Peringatan dini"], jawaban: "Pengurangan risiko" },
+        { pertanyaan: "Penggunaan tanda baca koma (,) yang TEPAT terdapat pada kalimat...", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Dia lupa, akan janjinya padaku.", "Karena sedih, ia menangis tersedu-sedu.", "Buku itu tebal, tetapi sangat menarik dibaca.", "Mahasiswa itu rajin, sehingga selalu mendapat nilai A.", "Ayah membaca koran, di teras depan."], jawaban: "Buku itu tebal, tetapi sangat menarik dibaca." },
+        { pertanyaan: "Lengkapi analogi berikut!\n\nMOBIL : BENSIN = PELARI : ...", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Makanan", "Sepatu", "Lintasan", "Piala", "Pelatih"], jawaban: "Makanan" },
+        { pertanyaan: "Manakah kalimat berikut yang termasuk kalimat efektif?", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Kepada para mahasiswa diwajibkan untuk hadir tepat waktu.", "Buku itu sudah saya baca berulang kali.", "Tujuan daripada penelitian ini adalah untuk mengetahui tingkat polusi.", "Meskipun lelah, namun ia tetap menyelesaikan tugasnya.", "Bagi peserta yang membawa kendaraan harap diparkir di belakang."], jawaban: "Buku itu sudah saya baca berulang kali." },
+        { pertanyaan: "Antonim (lawan kata) dari kata 'SKEPTIS' adalah...", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Ragu-ragu", "Curiga", "Yakin", "Pesimis", "Optimis"], jawaban: "Yakin" },
+        { pertanyaan: "Perhatikan kalimat berikut:\n'Inovasi teknologi kecerdasan buatan telah mengubah lanskap industri modern secara radikal.'\n\nKata 'radikal' pada kalimat tersebut bersinonim dengan...", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Sedikit demi sedikit", "Menyeluruh", "Berbahaya", "Keras", "Mendadak"], jawaban: "Menyeluruh" },
 
-        // --- B. INGGRIS ---
-        { pertanyaan: "Which sentence best shows disagreement?", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["I totally agree with you", "That’s a good idea", "I’m not sure I agree with that", "Exactly!", "I couldn’t agree more"], jawaban: "I’m not sure I agree with that" },
-        { pertanyaan: "Which sentence is passive voice?", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["The teacher explains the lesson", "The lesson explains the teacher", "The lesson is explained by the teacher", "The teacher is explaining the lesson", "The teacher has explained the lesson"], jawaban: "The lesson is explained by the teacher" },
-        { pertanyaan: "“If I had more time, I would join the competition.”\nThis sentence is…", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["Conditional type 0", "Conditional type 1", "Conditional type 2", "Conditional type 3", "Future continuous"], jawaban: "Conditional type 2" },
+        // --- LITERASI B. INGGRIS ---
+        { pertanyaan: "If the manager had received the proposal yesterday, he ___ it by now.", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["would review", "will review", "would have reviewed", "reviewed", "had reviewed"], jawaban: "would have reviewed" },
+        { pertanyaan: "The word 'ubiquitous' in the following sentence is closest in meaning to...\n\n'Smartphones have become ubiquitous in modern society.'", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["Rare", "Expensive", "Omnipresent", "Obsolete", "Complicated"], jawaban: "Omnipresent" },
+        { pertanyaan: "Identify the correct indirect speech:\n\nShe said, 'I am reading a book now.'", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["She said that she is reading a book now.", "She said that she was reading a book then.", "She said that she had been reading a book then.", "She said that I am reading a book now.", "She said she was reading a book now."], jawaban: "She said that she was reading a book then." },
+        { pertanyaan: "Not only ___ the competition, but she also broke the national record.", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["did she win", "she won", "she did win", "won she", "does she win"], jawaban: "did she win" },
+        { pertanyaan: "The new bridge, ___ was built last year, has already started showing cracks.", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["who", "whom", "where", "which", "whose"], jawaban: "which" },
+        { pertanyaan: "What is the opposite meaning of the word 'diligent'?", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["Hardworking", "Careful", "Lethargic", "Smart", "Persistent"], jawaban: "Lethargic" },
 
-        // --- MATEMATIKA ---
-        { pertanyaan: "Di bukit yang sejuk terdapat 600 peternak domba dan sapi. Ada 400 yang beternak domba dan 300 beternak sapi.\nJika A adalah jumlah minimum peternak kedua hewan tersebut dan B adalah jumlah maksimum peternak keduanya, maka B − A adalah . . .", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["350", "300", "280", "200", "150"], jawaban: "200" },
-        { pertanyaan: "Antara tahun 1497 dan 1500 Amerigo Vespucci melakukan dua kali perjalanan ke ‘Dunia Baru’.\nPerjalanan pertama memakan waktu 43 hari lebih lama daripada perjalanan kedua. Dan kedua perjalanan jika digabungkan memakan waktu 1003 hari.\nBerapa hari total perjalanan yang kedua?", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["460", "480", "960", "520", "540"], jawaban: "480" },
-        { pertanyaan: "Sebuah silinder A memiliki volume 22 cm3. Berapakah volume silinder lain yang memiliki jari-jari 2 kalinya silinder A, dan tingginya setengah silinder A?\n(dalam satuan cm3).", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["11", "22", "44", "66", "77"], jawaban: "44" },
+        // --- PENGETAHUAN KUANTITATIF (MATEMATIKA DASAR) ---
+        { pertanyaan: "Jika x dan y adalah bilangan bulat positif yang memenuhi:\n- x + y = 10\n- xy = 21\n\nMaka nilai mutlak dari |x - y| adalah...", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["2", "3", "4", "5", "6"], jawaban: "4" },
+        { pertanyaan: "Diketahui matriks A = [[2, x], [y, 4]] dan matriks B = [[1, 3], [2, 5]].\n\nJika determinan matriks AB adalah 10, maka nilai dari 8 - (xy) adalah...", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["-2", "0", "10", "18", "20"], jawaban: "18" },
+        { pertanyaan: "Dalam sebuah ruangan terdapat 10 orang yang saling berjabat tangan satu sama lain tepat satu kali.\n\nBerapa banyak jabat tangan yang terjadi secara keseluruhan?", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["45", "50", "90", "100", "120"], jawaban: "45" },
+        { pertanyaan: "Akar-akar persamaan kuadrat 2x² - 6x + m = 0 adalah p dan q.\n\nJika p² + q² = 5, maka nilai m adalah...", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["1", "2", "3", "4", "5"], jawaban: "2" },
+        { pertanyaan: "Peluang hujan pada hari Senin adalah 0,6 dan peluang hujan pada hari Selasa adalah 0,4.\n\nPeluang tidak hujan pada kedua hari tersebut adalah...", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["0,16", "0,24", "0,36", "0,48", "0,76"], jawaban: "0,24" },
+        { pertanyaan: "Suku ke-n dari suatu barisan geometri dirumuskan dengan Un = 3 × 2^(n-1).\n\nJumlah 5 suku pertama barisan tersebut adalah...", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["93", "96", "189", "192", "381"], jawaban: "93" },
 
-        // --- FISIKA ---
-        { pertanyaan: "Dalam sebuah bejana yang massanya dapat diabaikan terdapat a gram 42°C. dicampur dengan b gram es -4°C.\nternyata setelah diaduk 50% es melebur. Jika titik lebur es 0°C, kalor jenis es 0,5 kal/gr°C, kalor lebur es 80 kal/gr, maka perbandingan antara a dan b adalah ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["1 : 4", "1 : 2", "1 : 1", "2 : 1", "4 : 1"], jawaban: "1 : 1" },
-        { pertanyaan: "Pada sebuah system peredaran darah hewan, jari-jari pembuluh nadinya adalah 1,2 cm.\nDarah mengalir dari pembuluh nadi dengan kelajuan 0,40 m/s menuju ke semua pembuluh kapiler yang ada dengan kelajuan rata-rata 0,5 mm/s dan jari-jari pembuluh kapiler 8 x 10-4 cm.\nJumlah pembuluh kapiler adalah … miliar.", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["2,1", "1,8", "1,5", "1,2", "0,9"], jawaban: "1,8" },
-        { pertanyaan: "Sebuah beban bermassa m yang diikatkan pada ujung kanan sebuah pegas dengan konstanta pegas k diletakkan pada lantai datar dengan ujung pegas sebelah kiri terikat pada dinding.\nBeban ditarik ke kanan sampai ke titik A yang berjarak a dari titik setimbang dan kemudian dilepaskan sehingga berosilasi.\nSetelah dilepas, beban bergerak ke kiri, melewati titik setimbang O dan berhenti sesaat di titik B sebelah kiri titik setimbang.\nApabila lantai licin sempurna serta M dan K berturut-turut adalah energi mekanik dan energi kinetic system, maka…", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["K di O kurang dari K di B", "K di O sama dengan K di B", "K di O kurang dari M di A", "K di O sama dengan M di A", "K di O lebih dari M di A"], jawaban: "K di O sama dengan M di A" },
+        // --- PENALARAN UMUM (LOGIKA) ---
+        { pertanyaan: "Premis 1: Jika hari hujan, maka jalanan licin.\nPremis 2: Jika jalanan licin, maka banyak kecelakaan.\nFakta: Saat ini tidak banyak kecelakaan.\n\nKesimpulannya adalah...", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Hari hujan.", "Jalanan licin.", "Hari tidak hujan.", "Hari hujan dan banyak kecelakaan.", "Tidak ada kesimpulan yang sah."], jawaban: "Hari tidak hujan." },
+        { pertanyaan: "Premis 1: Semua mahasiswa di kelas A pandai coding.\nPremis 2: Sebagian yang pandai coding juga pandai desain.\n\nKesimpulan yang tepat adalah...", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Semua mahasiswa kelas A pandai desain.", "Sebagian mahasiswa kelas A pandai desain.", "Semua yang pandai desain adalah mahasiswa kelas A.", "Tidak ada mahasiswa kelas A yang pandai desain.", "Ada yang pandai coding namun bukan mahasiswa kelas A."], jawaban: "Ada yang pandai coding namun bukan mahasiswa kelas A." },
+        { pertanyaan: "Diberikan deret angka berikut:\n2, 5, 10, 17, 26, ...\n\nAngka selanjutnya dari pola tersebut adalah...", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["35", "37", "39", "41", "45"], jawaban: "37" },
+        { pertanyaan: "Toko A memberikan diskon 20% kemudian tambahan diskon 10% untuk buku.\nToko B memberikan diskon 15% kemudian tambahan diskon 15% untuk buku yang sama.\n\nJika harga awal sama, maka...", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Harga akhir di Toko A lebih murah.", "Harga akhir di Toko B lebih murah.", "Harga akhir di kedua toko sama.", "Toko B lebih menguntungkan penjual.", "Tidak bisa ditentukan."], jawaban: "Harga akhir di Toko B lebih murah." },
+        { pertanyaan: "Lima orang (P, Q, R, S, T) duduk melingkar dengan syarat:\n- P bersebelahan dengan Q.\n- R tidak bersebelahan dengan P maupun Q.\n- S duduk di sebelah kanan R.\n\nSiapa yang duduk di antara Q dan R?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["P", "S", "T", "Tidak ada", "P dan T"], jawaban: "T" },
+        { pertanyaan: "Jika X > Y dan Y < Z, maka pernyataan yang PASTI BENAR adalah...", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["X > Z", "X < Z", "Z > X", "Y adalah yang terkecil", "X dan Z sama besar"], jawaban: "Y adalah yang terkecil" },
 
-        // --- BIOLOGI ---
-        { pertanyaan: "Karbon sangat dibutuhkan oleh makhluk hidup dalam proses metabolisme dan penyusunan senyawa organik.\nKeberadaan karbon di alam berlangsung melalui siklus karbon yang terjadi secara terus-menerus.\n\n[Gambar Siklus Karbon]\nProses yang terjadi pada bagian X adalah ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Fotosintesis", "respirasi", "asimilasi", "evaporasi", "transpirasi"], jawaban: "respirasi" },
-        { pertanyaan: "Seorang siswa meneliti kualitas air di sebuah kanal perkotaan. Ia memperoleh data sebagai berikut:\n\nParameter | Sebelum tercemar | Setelah tercemar\nDO | 7 mg/L | 2 mg/L\nBOD | 2 mg/L | 8 mg/L\n\nBerdasarkan data tersebut, kesimpulan yang paling tepat adalah…", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["kualitas air meningkat karena BOD tinggi", "terjadi pencemaran bahan organik yang meningkatkan aktivitas mikroorganisme", "kadar oksigen meningkat akibat penguraian bahan organik", "perairan menjadi lebih layak untuk organisme air", "tidak ada hubungan antara DO dan BOD"], jawaban: "terjadi pencemaran bahan organik yang meningkatkan aktivitas mikroorganisme" },
-        { pertanyaan: "Perhatikan gambar berikut !\n\n[Gambar Sistem Reproduksi Wanita]\nKetika sel sperma berhasil menembus zona pelusida maka akan terjadi fertilisasi yang akan dilanjutkan dengan perkembangan embrio.\nFertilisasi dan perkembangan embrio terjadi…", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["N dan L", "L dan M", "M dan N", "L dan P", "N dan O"], jawaban: "N dan L" },
+        // --- SAINTEK: FISIKA ---
+        { pertanyaan: "Benda bermassa 5 kg ditarik dengan gaya mendatar 20 N di atas lantai kasar.\n\nJika koefisien gesek kinetis = 0,2 dan g = 10 m/s², percepatan benda adalah...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["1 m/s²", "2 m/s²", "3 m/s²", "4 m/s²", "Benda tidak bergerak"], jawaban: "2 m/s²" },
+        { pertanyaan: "Dua muatan q₁ = 4 μC dan q₂ = 9 μC terpisah sejauh 10 cm.\n\nLetak sebuah titik yang kuat medan listriknya nol dari muatan q₁ berada pada jarak...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["2 cm", "4 cm", "5 cm", "6 cm", "8 cm"], jawaban: "4 cm" },
+        { pertanyaan: "Sebuah transformator step-up memiliki efisiensi 80%.\n\nJika daya masukan 100 Watt dan tegangan keluaran 200 V, berapakah kuat arus keluarannya?", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["0,2 A", "0,4 A", "0,5 A", "0,8 A", "1,0 A"], jawaban: "0,4 A" },
+        { pertanyaan: "Gas ideal berekspansi secara isotermal dari volume V menjadi 2V.\n\nDalam proses ini...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Suhu gas naik", "Tekanan gas menjadi setengahnya", "Energi dalam gas bertambah", "Gas tidak menyerap kalor", "Tekanan gas tetap"], jawaban: "Tekanan gas menjadi setengahnya" },
 
-        // --- KIMIA ---
-        { pertanyaan: "Dalam analisis air limbah industri, seorang ahli kimia menemukan ion oksigen dengan karakteristik khusus.\nIon ini memiliki nomor atom 8, nomor massa 17 dan bermuatan -2.\nBerdasarkan data tersebut, spesi ion O2- mengandung jumlah proton dan elektron secara berturut-turut….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["8 proton dan 8 elektron", "8 proton dan 10 elektron", "10 proton dan 8 elektron", "9 proton dan 8 elektron", "6 proton dan 10 elektron"], jawaban: "8 proton dan 10 elektron" },
-        { pertanyaan: "Unsur X dengan konfigurasi elektron: 1s2 2s2 2p6 3s2 bereaksi dengan unsur Y : 1s2 2s2 2p4 membentuk senyawa….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["XY", "XY2", "X2Y", "X3Y", "X2Y3"], jawaban: "XY" },
-        { pertanyaan: "Dalam industri pemanas ruangan, gas propana (C3H8) digunakan sebagai bahan bakar. Persamaan reaksinya sebagai berikut.\nC3H8(g) + O2(g) -> CO2(g) + H2O(g) (belum setara)\nJika terdapat 5 L gas propana, volume gas oksigen yang dibutuhkan untuk pembakaran sempurna gas propana adalah….(semua volume diukur pada kondisi yang sama)", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["5 L", "10 L", "15 L", "20 L", "25 L"], jawaban: "25 L" },
+        // --- SAINTEK: KIMIA ---
+        { pertanyaan: "Suatu larutan penyangga terdiri dari campuran CH₃COOH 0,1 M dan CH₃COONa 0,1 M.\n\nJika Ka CH₃COOH = 10⁻⁵, berapakah pH larutan tersebut?", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["4", "5", "6", "8", "9"], jawaban: "5" },
+        { pertanyaan: "Diketahui reaksi pembentukan gas amonia:\nN₂(g) + 3H₂(g) ⇌ 2NH₃(g) dengan ΔH = -92 kJ.\n\nUntuk memperbanyak hasil amonia, tindakan yang paling tepat adalah...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Menaikkan suhu", "Menambah katalisator", "Menurunkan tekanan ruang", "Memperbesar volume ruang", "Menurunkan suhu"], jawaban: "Menurunkan suhu" },
+        { pertanyaan: "Konfigurasi elektron ion X³⁺ adalah [Ar] 3d⁵.\n\nAtom X dalam sistem periodik terletak pada golongan dan periode...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["VIII B, periode 4", "V B, periode 4", "III B, periode 3", "V B, periode 3", "VIII A, periode 4"], jawaban: "VIII B, periode 4" },
+        { pertanyaan: "Oksidasi alkohol primer menggunakan kalium dikromat (K₂Cr₂O₇) bersuasana asam akan menghasilkan senyawa golongan...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Keton", "Ester", "Eter", "Aldehid lalu Asam Karboksilat", "Alkana"], jawaban: "Aldehid lalu Asam Karboksilat" },
 
-        // --- PENALARAN UMUM ---
-        { pertanyaan: "Badak Jawa (Rhinoceros sondaicus) adalah spesies badak yang paling langka diantara lima spesies badak yang ada di dunia.\nMakin langka suatu hewan, makin besar upaya yang harus dilakukan manusia untuk mencegahnya dari kepunahan.\nBerdasarkan pernyataan tersebut, manakah yang paling mungkin menjadi akibat dari tingkat kelangkaan Badak Jawa?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Badak Jawa menjadi objek wisata yang paling dicari.", "Badak Jawa sulit dikembangbiakkan secara alamiah.", "Badak Jawa sulit ditemukan di hutan yang tidak dikelola manusia.", "Badak Jawa sering menjadi sasaran objek penelitian.", "Badak Jawa membutuhkan biaya konservasi yang besar."], jawaban: "Badak Jawa membutuhkan biaya konservasi yang besar." },
-        { pertanyaan: "Jumlah penjualan mie ayam di sebuah warung makan pada enam hari terakhir adalah 5, 3, 8, 11, 19, dan 30 porsi.\nSementara itu, jumlah bakso yang terjual pada enam hari yang sama adalah 4, 6, 10, 16, 26, dan 42 porsi.\nJika tren pembelian tersebut bersifat konstan, berapa jumlah porsi mie ayam dan bakso yang terjual pada hari ketujuh?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["28 dan 50", "46 dan 68", "49 dan 50", "28 dan 70", "49 dan 68"], jawaban: "49 dan 68" },
-        { pertanyaan: "Syarat untuk mendapatkan posisi sebagai asisten dosen adalah memiliki gelar sarjana, pengalaman mengikuti matakuliah secara baik, dan referensi dari para dosen pengampu.\nCalon asisten X memiliki gelar sarjana dan referensi yang kuat.\nSimpulan dari informasi tersebut adalah calon X akan diterima sebagai asisten dosen.\nManakah pernyataan berikut yang menggambarkan kualitas simpulan tersebut?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Simpulan tersebut pasti benar.", "Simpulan tersebut mungkin benar.", "Simpulan tersebut pasti salah.", "Simpulan tidak dapat dinilai karena informasi tidak cukup.", "Simpulan tidak relevan dengan informasi yang diberikan."], jawaban: "Simpulan tidak dapat dinilai karena informasi tidak cukup." },
+        // --- SAINTEK: BIOLOGI ---
+        { pertanyaan: "Organel sel yang berfungsi sebagai tempat berlangsungnya respirasi seluler untuk menghasilkan energi (ATP) adalah...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Badan Golgi", "Retikulum Endoplasma", "Lisosom", "Mitokondria", "Nukleus"], jawaban: "Mitokondria" },
+        { pertanyaan: "Seorang laki-laki buta warna menikah dengan wanita normal carrier.\n\nPersentase kemungkinan anak laki-laki mereka mengalami buta warna adalah...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["0%", "25%", "50%", "75%", "100%"], jawaban: "50%" },
+        { pertanyaan: "Proses pemecahan glikogen menjadi glukosa yang terjadi di dalam organ hati dirangsang oleh hormon...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Insulin", "Adrenalin", "Glukagon", "Tiroksin", "Oksitosin"], jawaban: "Glukagon" },
+        { pertanyaan: "Jaringan pada tumbuhan yang selalu aktif membelah dan biasanya terletak di ujung akar serta ujung batang disebut jaringan...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Parenkim", "Sklerenkim", "Meristem apikal", "Kolenkim", "Xilem"], jawaban: "Meristem apikal" },
 
-        // --- PENGETAHUAN KUANTITATIF ---
-        { pertanyaan: "Jika 0°<α<90° dan tanα=1/3 , di antara pilihan berikut yang benar adalah ...\n(1) cos(α) = 1/3\n(2) sin(α) = 3/√10\n(3) cos(α) < tan(α)\n(4) tan(90°-α) = 3", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["(1), (2), dan (3) saja", "(1) dan (3) saja", "(2) dan (4) saja", "(1), (2), (3) dan (4)", "(4) saja"], jawaban: "(4) saja" },
-        { pertanyaan: "Tabel berikut menyatakan hasil operasi untuk simbol ⊛ dan ⊝\n[Tabel Operasi ⊛ dan ⊝]\nOperasi ⊕ didefinisikan dengan\na⊕b = 2⊛(a⊝b)\nUntuk semua a,b ∈ {0, 1, 2, 3}\nNilai dari 0⊕2 adalah...", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["0", "1", "2", "3", "4"], jawaban: "2" },
-        { pertanyaan: "Perhatikan algoritma yang disajikan pada diagram berikut.\n[Gambar Algoritma 1]\nKeterangan : Bilangan asli m dan n memenuhi kedua pernyataan berikut.\nInput x = 3 menghasilkan z = 12 .\nInput x = 4 menghasilkan z = 18\nNilai m adalah...", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["1", "2", "3", "4", "5"], jawaban: "2" },
+        // --- SOSHUM ---
+        { pertanyaan: "Sistem Tanam Paksa (Cultuurstelsel) di Indonesia dicetuskan pada tahun 1830 oleh Gubernur Jenderal...", kategori: "sejarah", tipe: "pilihan_ganda", opsi: ["H.W. Daendels", "Thomas Stamford Raffles", "Johannes van den Bosch", "J.P. Coen", "Cornelis de Houtman"], jawaban: "Johannes van den Bosch" },
+        { pertanyaan: "Prasasti Yupa peninggalan Kerajaan Kutai yang menggunakan huruf Pallawa dan bahasa Sanskerta, secara spesifik menceritakan tentang...", kategori: "sejarah", tipe: "pilihan_ganda", opsi: ["Pembangunan candi", "Silsilah raja-raja Tarumanegara", "Kedermawanan Raja Mulawarman yang menyedekahkan 20.000 ekor sapi", "Kutukan bagi yang menentang raja", "Perluasan wilayah maritim"], jawaban: "Kedermawanan Raja Mulawarman yang menyedekahkan 20.000 ekor sapi" },
+        { pertanyaan: "Fenomena El Nino yang terjadi di Indonesia umumnya menyebabkan dampak berupa...", kategori: "geografi", tipe: "pilihan_ganda", opsi: ["Musim hujan berkepanjangan", "Suhu udara menurun drastis", "Terjadinya kemarau panjang dan kekeringan", "Angin puting beliung di pesisir", "Peningkatan jumlah ikan tangkapan nelayan"], jawaban: "Terjadinya kemarau panjang dan kekeringan" },
+        { pertanyaan: "Pola pemukiman penduduk yang berada di kawasan daerah pegunungan kapur (karst) umumnya berbentuk...", kategori: "geografi", tipe: "pilihan_ganda", opsi: ["Memanjang (linier)", "Memusat (radial)", "Menyebar (dispersed)", "Mengelompok padat", "Sejajar jalan raya"], jawaban: "Menyebar (dispersed)" },
+        { pertanyaan: "Asimilasi sebagai bentuk interaksi sosial disosiatif memiliki ciri utama yaitu...", kategori: "sosiologi", tipe: "pilihan_ganda", opsi: ["Mempertahankan kebudayaan asli", "Peleburan dua budaya yang menghasilkan budaya baru", "Penguasaan budaya kuat terhadap budaya lemah", "Penolakan terhadap budaya asing", "Peniruan budaya asing tanpa modifikasi"], jawaban: "Peleburan dua budaya yang menghasilkan budaya baru" },
+        { pertanyaan: "Seorang anak petani desa berhasil sukses menjadi pengusaha besar dan pindah ke kota.\n\nBentuk mobilitas sosial yang dialaminya adalah...", kategori: "sosiologi", tipe: "pilihan_ganda", opsi: ["Mobilitas vertikal naik antargenerasi", "Mobilitas horizontal", "Mobilitas vertikal turun", "Mobilitas intragenerasi naik", "Mobilitas geografis murni"], jawaban: "Mobilitas vertikal naik antargenerasi" },
+        { pertanyaan: "Menurut UUD 1945 Pasal 1 ayat 3, secara tegas dinyatakan bahwa Negara Indonesia adalah negara...", kategori: "pkn", tipe: "pilihan_ganda", opsi: ["Kesatuan", "Republik", "Hukum", "Demokrasi", "Berdaulat"], jawaban: "Hukum" },
+        { pertanyaan: "Jika harga barang X naik, maka permintaan terhadap barang Y (yang merupakan barang substitusi X) akan...", kategori: "ekonomi", tipe: "pilihan_ganda", opsi: ["Turun", "Tetap", "Naik", "Tidak bisa diprediksi", "Menjadi elastis"], jawaban: "Naik" },
+        { pertanyaan: "Dalam kurva penawaran, pergeseran kurva secara keseluruhan ke arah kanan dapat disebabkan oleh faktor...", kategori: "ekonomi", tipe: "pilihan_ganda", opsi: ["Kenaikan harga bahan baku", "Kenaikan pajak produksi", "Penurunan jumlah produsen", "Kemajuan teknologi produksi", "Penurunan daya beli masyarakat"], jawaban: "Kemajuan teknologi produksi" },
 
-        // --- SOSIAL & KEWARGANEGARAAN ---
-        { pertanyaan: "Makna dari semboyan Bhinneka Tunggal Ika adalah Berbeda-beda tetapi tetap satu jua, yang memiliki fungsi utama bagi bangsa Indonesia sebagai . . .", kategori: "pkn", tipe: "pilihan_ganda", opsi: ["simbol kekayaan budaya", "alat untuk menyeragamkan budaya", "landasan hukum yang berlaku", "pemersatu keberagaman suku, agama, dan ras", "semboyan keberagaman partai politik"], jawaban: "pemersatu keberagaman suku, agama, dan ras" },
-        { pertanyaan: "Letusan gunung Merapi mengeluarkan material vulkanik yang bermanfaat bagi kesuburan tanah sehingga penduduk di desa Cangkringan sekitar gunung Merapi, enggan dipindahkan dari areal yang berbahaya.\nPrinsip geografi yang berkaitan dengan hal tersebut adalah ....", kategori: "geografi", tipe: "pilihan_ganda", opsi: ["prinsip persebaran", "prinsip deskripsi", "prinsip distribusi", "prinsip korologi", "prinsip interelasi"], jawaban: "prinsip interelasi" },
-        { pertanyaan: "Perhatikan nama-nama suku di bawah ini :\n1) Suku Nias\n2) Suku Toraja\n3) Suku Jawa\n4) Suku Dayak\n5) Suku Baduy\nDari nama suku di atas yang merupakan bangsa Proto Melayu adalah nomor…", kategori: "sejarah", tipe: "pilihan_ganda", opsi: ["1, 4, dan 5", "1, 3, dan 4", "1, 2, dan 4", "3, 4, dan 5", "2, 3, dan 5"], jawaban: "1, 2, dan 4" },
-        { pertanyaan: "Perhatikan sikap dan tindakan berikut!.\n1) Mengembangkan sikap intoleransi antar individu\n2) Mengedepankan sikap saling tolong menolong\n3) Mengabaikan nilai dan norma sosial yang berlaku\n4) Menjadi media penyatu pola pikir dan tujuan yang berbeda\n5) Menyelesaikan permasalahan melalui musyawarah mufakat\nHubungan sosial yang positif ditunjukkan oleh nomor ….", kategori: "sosiologi", tipe: "pilihan_ganda", opsi: ["1, 2 dan 3", "1, 2 dan 4", "2, 3 dan 4", "2, 4 dan 5", "3, 4 dan 5"], jawaban: "2, 4 dan 5" },
-        { pertanyaan: "Pernyataan berikut merupakan kelebihan sistem ekonomi.\n1) Produk yang dihasilkan lebih berkualitas.\n2) Perekonomian relatf stabil dan jarang terjadi krisis ekonomi.\n3) Fakir miskin dan anak terlantar dipelihara oleh negara.\n4) Mengutamakan kepentingan bersama daripada kepentingan individu.\n5) Daya inisiatif, kreasi, dan persaingan individu bisa berkembang.\nYang merupakan kelebihan sistem demokrasi ekonomi ditunjukkan oleh angka ….", kategori: "ekonomi", tipe: "pilihan_ganda", opsi: ["1), 2), dan 3)", "1), 3), dan 4)", "1), 4), dan 5)", "2), 3), dan 4)", "3), 4), dan 5)"], jawaban: "3), 4), dan 5)" },
-        { pertanyaan: "Al-Quran sebagai pedoman hidup umat manusia, mengajarkan agar manusia menjaga kedamaian dan tolong menolong di dalam menjalani kehidupan.\nWalaupun hidup dalam perbedaan tetapi harus tetap saling menghormati. Perilaku yang tidak mencerminkan beriman kepada ajaran al-Quran di lingkungan sekolah adalah….", kategori: "agama", tipe: "pilihan_ganda", opsi: ["menolong teman yang mengalami kesulitan tanpa memandang agamanya", "menghormati pemeluk agama lain yang melaksanakan ibadah", "bekerja sama antar pemeluk agama di sekolah untuk melakukan bakti sosial", "menghindari bergaul dengan teman yang berlainan agama dengannya", "menghargai semua temannya walaupun berbeda suku"], jawaban: "menghindari bergaul dengan teman yang berlainan agama dengannya" },
-
-        // --- B. INDONESIA (Bagian 2) ---
-        { pertanyaan: "Banyak masyarakat mengeluhkan sulitnya mendapatkan air bersih. Air tanah yang makin tercemar limbah membuat masyarakat harus membeli air galon untuk keperluan sehari-hari.\nTidak hanya itu, sumber air dari sumur pun sudah tidak layak konsumsi.\nKondisi ini menunjukkan bahwa masalah air bersih harus segera ditangani oleh pemerintah.\nBerdasarkan letak kalimat utamanya, teks tersebut termasuk jenis paragraf", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["campuran", "ineratif", "induktif", "deduktif", "deskriptif"], jawaban: "induktif" },
-        { pertanyaan: "Truk antikabut menyemprotkan udara di terlihat sepanjang jalan.\nKalimat tersebut akan sempurna apabila diperbaiki menjadi", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["Truk antikabut udara di terlihat menyemprotkan sepanjang jalan.", "Truk menyemprotkan antikabut udara di terlihat sepanjang jalan.", "Truk antikabut terlihat menyemprotkan udara di sepanjang jalan.", "Truk antikabut terlihat udara menyemprotkan di sepanjang jalan.", "Truk antikabut sepanjang terlihat menyemprotkan udara jalan."], jawaban: "Truk antikabut terlihat menyemprotkan udara di sepanjang jalan." },
-        { pertanyaan: "Meskipun buku ini menarik, tetapi ada beberapa bagian yang terasa terlalu lambat dan berulang-ulang.\nHal ini membuat pembaca agak bosan di tengah cerita.\nKutipan tersebut merupakan bagian dari struktur teks resensi, yaitu", kategori: "b_indo", tipe: "pilihan_ganda", opsi: ["sinopsis", "kelemahan", "keunggulan", "pendahuluan", "penutup"], jawaban: "kelemahan" },
-
-        // --- B. INGGRIS (Bagian 2) ---
-        { pertanyaan: "Which sentence shows strong agreement?", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["I’m not sure", "I disagree", "That might be true", "I completely agree", "I doubt it"], jawaban: "I completely agree" },
-        { pertanyaan: "Which is correct passive form?", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["People speak English worldwide", "English is spoken worldwide", "English speaks worldwide", "People are spoken English", "Spoken English worldwide"], jawaban: "English is spoken worldwide" },
-        { pertanyaan: "“If she studies hard, she will pass the exam.”\nThis is…", kategori: "b_inggris", tipe: "pilihan_ganda", opsi: ["Type 0", "Type 1", "Type 2", "Type 3", "Mixed conditional"], jawaban: "Type 1" },
-
-        // --- MATEMATIKA (Bagian 2) ---
-        { pertanyaan: "Rumah di Jalan Veteran dinomori secara urut mulai dari 1 sampai 150. Berapa banyak rumah yang nomornya menggunakan angka 8 sekurang-kurangnya satu kali . . .", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["14", "15", "21", "24", "30"], jawaban: "24" },
-        { pertanyaan: "Dalam sebuah komunitas yang beranggota 800 orang, ternyata 400 orang suka membaca dan 620 orang menulis.\nJika x adalah jumlah maksimal orang yang suka keduanya dan y adalah jumlah minimal yang suka keduanya, maka x + y = . . .", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["400", "530", "620", "710", "890"], jawaban: "620" },
-        { pertanyaan: "Alas sebuah segitiga memiliki panjang 𝑏, dan memiliki hubungan dengan tinggi ℎ. Hubungan tersebut memenuhi 𝑏 = 2ℎ.\nManakah ekspresi matematika berikut yang menyatakan luas segitiga dalam bentuk ℎ?", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["1/2 h2", "3/4 h2", "h2", "3/2 h2", "2 h2"], jawaban: "h2" },
-
-        // --- FISIKA (Bagian 2) ---
-        { pertanyaan: "Ke dalam sebuah bejana yang berisi a gram air 30°C dimasukkan b gram es -2°C.\nsetelah isi bejana diaduk, ternyata semua es melebur. Bila massa bejana diabaikan, kalor jenis es 0,5 kal/gr°C dan kalor lebur es 80 kal/gr, maka besar perbandingan antara a dan b adalah ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["27 : 10", "8 : 3", "10 : 27", "3 : 8", "1 : 30"], jawaban: "27 : 10" },
-        { pertanyaan: "Pada pukul 07.00 WITA, sebuah kolam penampungan air berbentuk kubus dengan sisi 1 m akan diisi air dari keadaan kosong melalui kran air yang penampangnya 2 cm2.\nJika rata-rata air mengalir dengan kecepatan 5 m/s, maka kolam akan penuh pada pukul ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["07.16", "07.16 lebih 40 detik", "07.26", "07.26 lebih 40 detik", "07.36"], jawaban: "07.16 lebih 40 detik" },
-        { pertanyaan: "Sebuah beban bermassa m yang diikatkan pada ujung kanan sebuah pegas dengan konstanta pegas k diletakkan pada lantai datar dengan ujung pegas sebelah kiri terikat pada dinding.\nBeban ditarik ke kanan sampai ke titik A yang berjarak a dari titik setimbang dan kemudian dilepaskan sehingga berosilasi.\nSetelah dilepas, beban bergerak ke kiri, melewati titik setimbang O dan berhenti sesaat di titik B, di sebelah kiri titik setimbang.\nApabila Ep dan Ek berturut-turut adalah energi potensial dan energi kinetic system, serta Ek di O sama dengan Ep di A, pernyataan yang benar adalah ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Jarak titik B ke titik setimbang kurang dari a", "Jarak titik B ke titik setimbang lebih dari a", "Energi mekanik berkurang", "Lantai licin sempurna", "Lantai kasar"], jawaban: "Lantai licin sempurna" },
-
-        // --- BIOLOGI (Bagian 2) ---
-        { pertanyaan: "Nitrogen sangat dibutuhkan oleh tanaman dalam pertumbuhannya. Keberadaan Nitrogen melalui proses siklus nitrogen yang terjadi di alam.\n\n[Gambar Siklus Nitrogen]\nSecara berurutan, proses yang terjadi pada bagian X dan Y adalah aktivitas bakteri dalam proses ….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["nitrifikasi dan denitrifikasi", "nitrifikasi dan fiksasi nitrogen", "fiksasi nitrogen dan nitrifikasi", "denitrifikasi dan fiksasi nitrogen", "fiksasi nitrogen dan denitrifikasi"], jawaban: "fiksasi nitrogen dan nitrifikasi" },
-        { pertanyaan: "Karbon dioksida menyumbang 75% emisi gas rumah kaca sehingga konsentrasi gas rumah kaca dapat meningkat drastis akibat emisi karbon dioksida dan gas-gas rumah kaca yang dihasilkan oleh berbagai aktivitas manusia di muka bumi ini.\nSelanjutnya secara global, 25% atau seperempat dari seluruh emisi karbon dioksida dunia berasal dari masalah-masalah kehutanan, sedangkan sisanya dihasilkan dari pembakaran bahan bakar fosil, yaitu minyak bumi dan batu bara.\nEmisi gas CO₂ yang berlebihan di udara menimbulkan peristiwa...", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["lubang ozon", "asfiksi", "global warming", "hujan asam", "eutrofikasi"], jawaban: "global warming" },
-        { pertanyaan: "Perhatikan struktur nefron berikut!\n\n[Gambar Struktur Nefron]\nAbi sedang mempelajari proses pembentukan urin di ginjal. Ia mengamati bahwa pada bagian yang bertanda X terjadi proses penting yang berfungsi mengembalikan zat-zat yang masih dibutuhkan tubuh ke dalam darah.\nProses ini sangat penting untuk menjaga keseimbangan cairan dan mencegah kehilangan zat berguna dalam urin.\nBerdasarkan informasi tersebut, proses yang terjadi pada bagian X adalah …", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Penyerapan kembali air, glukosa, dan garam", "Penyaringan darah", "Pembentukan urin primer", "Pembentukan senyawa NH₃", "Pembentukan urin sesungguhnya"], jawaban: "Penyerapan kembali air, glukosa, dan garam" },
-
-        // --- KIMIA (Bagian 2) ---
-        { pertanyaan: "Seorang dokter menjelaskan bahwa atom natrium dalam senyawa garam dapur (NaCl) berbeda dengan atom natrium murni.\nDalam garam dapur, natrium berbentuk ion Na+ dengan nomor atom 11 dan nomor massa 23. Ion Na+ ini mengandung jumlah elektron dan neutron secara berturut-turut….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["8 elektron dan 10 neutron", "10 elektron dan 8 neutron", "10 elektron dan 12 neutron", "11 elektron dan 12 neutron", "12 elektron dan 10 neutron"], jawaban: "10 elektron dan 12 neutron" },
-        { pertanyaan: "Unsur P dan Q memiliki konfigurasi elektron sebagai berikut.\nP : [Ar] 4s2\nQ : [Ne] 3s2 3p5\nApabila unsur P dan Q membentuk senyawa, rumus senyawa yang terbentuk adalah….", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["PQ", "PQ2", "PQ3", "P2Q", "P3Q"], jawaban: "PQ2" },
-        { pertanyaan: "Seorang teknisi kompor gas melakukan uji pembakaran metana (CH4) untuk memastikan efisiensi kompor.\nDalam pembakaran sempurna, 5 L gas metana direaksikan dengan oksigen sesuai persamaan reaksi berikut:\nCH4(g) + O2(g) -> CO2(g) + H2O(g) (belum setara)\nVolume gas oksigen yang diperlukan untuk pembakaran sempurna tersebut adalah…. (semua volume diukur pada kondisi yang sama)", kategori: "ipa", tipe: "pilihan_ganda", opsi: ["5 L", "8 L", "10 L", "12,5 L", "15 L"], jawaban: "10 L" },
-
-        // --- PENALARAN UMUM (Sisa Bagian) ---
-        { pertanyaan: "Gandum adalah bahan makanan yang paling digemari masyarakat di Negara X. Makin digemari makanan di suatu negara, makin banyak bahan makanan tersebut ditanam.\nBerdasarkan informasi di atas, manakah pernyataan sebab-akibat berikut yang PALING MUNGKIN BENAR?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Gandum sebagai makanan pokok Negara X tidak bisa digantikan makanan lainnya.", "Banyaknya orang menanam gandum dipengaruhi oleh minat masyarakat untuk mengonsumsinya.", "Pemerintah Negara X harus menyediakan bibit gandum untuk kebutuhan pokok masyarakatnya.", "Kegemaran terhadap makanan menjadi bahan pertimbangan industri pertanian di suatu negara.", "Makanan pokok selain gandum cenderung tidak diminati masyarakat di Negara X."], jawaban: "Banyaknya orang menanam gandum dipengaruhi oleh minat masyarakat untuk mengonsumsinya." },
-        { pertanyaan: "Jumlah penjualan laptop pada minggu kedua sampai keenam secara berturut-turut adalah 18, 14, 17, 13, dan 16 unit.\nJika jumlah penjualan tersebut bersifat konstan, berapakah laptop yang terjual pada minggu pertama?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["11", "12", "15", "21", "22"], jawaban: "15" }
+        // --- CAMPURAN ---
+        { pertanyaan: "Pancasila secara resmi disahkan sebagai dasar negara pada tanggal...", kategori: "pkn", tipe: "pilihan_ganda", opsi: ["1 Juni 1945", "17 Agustus 1945", "18 Agustus 1945", "22 Juni 1945", "1 Oktober 1945"], jawaban: "18 Agustus 1945" },
+        { pertanyaan: "Pada masa Demokrasi Terpimpin, Presiden Soekarno mengeluarkan Dekrit Presiden yang berisi beberapa hal berikut, KECUALI...", kategori: "sejarah", tipe: "pilihan_ganda", opsi: ["Pembubaran Konstituante", "Berlakunya kembali UUD 1945", "Tidak berlakunya UUDS 1950", "Pembentukan MPRS dan DPAS", "Pelaksanaan Pemilihan Umum pertama"], jawaban: "Pelaksanaan Pemilihan Umum pertama" },
+        { pertanyaan: "Lapisan atmosfer tempat di mana terjadinya berbagai fenomena cuaca (seperti hujan, petir, dan angin) adalah lapisan...", kategori: "geografi", tipe: "pilihan_ganda", opsi: ["Stratosfer", "Mesosfer", "Troposfer", "Termosfer", "Eksosfer"], jawaban: "Troposfer" },
+        { pertanyaan: "Tentukan nilai dari limit berikut:\n\nLimit x → 2 dari [(x² - 4) / (x - 2)]", kategori: "mtk", tipe: "pilihan_ganda", opsi: ["0", "2", "4", "8", "Tidak terdefinisi"], jawaban: "4" },
+        { pertanyaan: "Sistem pemerintahan di mana kekuasaan eksekutif bertanggung jawab penuh kepada badan legislatif (parlemen) disebut sistem...", kategori: "pkn", tipe: "pilihan_ganda", opsi: ["Presidensial", "Parlementer", "Monarki Konstitusional", "Demokrasi Langsung", "Oligarki"], jawaban: "Parlementer" }
     ];
 
-    const dataInsertUtama = daftar50Soal.map(soal => ({
+    const soalUtamaDiacak = shuffleArray([...daftar50Soal]);
+
+    const dataInsertUtama = soalUtamaDiacak.map(soal => ({
         paketSoalId: paketUtama.id,
         pertanyaan: soal.pertanyaan,
         kategori: soal.kategori,
@@ -116,25 +117,42 @@ async function main() {
     }));
 
     await prisma.soal.createMany({ data: dataInsertUtama });
-    console.log(`   -> Berhasil memasukkan ${daftar50Soal.length} soal ke dalam ${paketUtama.nama}`);
+    console.log(`   -> Berhasil memasukkan ${dataInsertUtama.length} soal ke dalam ${paketUtama.nama} secara ACAK.`);
 
     // ==========================================
-    // 2. BUAT PAKET REBUTAN (5 SOAL SISA DARI DOC)
+    // 2. BUAT PAKET REBUTAN SEMI FINAL
     // ==========================================
     const paketRebutan = await prisma.paketSoal.create({
-        data: { nama: "Semi Final - Rebutan", babak: 'semi_final' }
+        data: { nama: "Semi Final - Rebutan UTBK", babak: 'semi_final' }
     });
     console.log(`✅ Paket dibuat: [ID: ${paketRebutan.id}] ${paketRebutan.nama}`);
 
     const daftarSoalRebutan = [
-        { pertanyaan: "Tedi menyatakan: Ketika saya pergi memancing beberapa hari yang lalu, setiap ikan yang saya tangkap adalah salmon, dan setiap salmon yang saya lihat saya tangkap.\nSimpulan dari pengamatan Tedi adalah saat Tedi memancing, dia tidak menangkap ikan apa pun selain salmon.\nManakah pernyataan berikut yang menggambarkan kualitas simpulan tersebut?", kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["Simpulan tersebut pasti benar", "Simpulan tersebut mungkin benar", "Simpulan tersebut pasti salah", "Simpulan tidak relevan dengan informasi yang diberikan", "Simpulan tidak dapat dinilai karena informasi tidak cukup"], jawaban: "Simpulan tersebut pasti benar" },
-        { pertanyaan: "Jika 0°<α<90° dan cosα=3/4 , di antara pilihan berikut yang benar adalah . . .\n(1) tanα=4/3\n(2) sin(α-90°)=-3/4\n(3) tan(90°-α)=-3/7\n(4) cos(α-180°)<sin(180°-α)", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["(1), (2), dan (3)", "(1) dan (3)", "(2) dan (4)", "(4)", "(1), (2), (3), dan (4)"], jawaban: "(2) dan (4)" },
-        { pertanyaan: "Operasi ⨂ dan ⊖ pada bilangan didefinisikan sebagai berikut.\na⊗b = (2-(a x b)) / (a+b)\nc⊝d = c+10d\nNilai dari 3⊖(4⨂(-1)) adalah... .", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["7", "8", "9", "10", "11"], jawaban: "11" },
-        { pertanyaan: "Perhatikan algoritma yang disajikan pada diagram berikut.\n\n[Gambar Algoritma 2]\nKeterangan : Bilangan asli m dan n memenuhi kedua pernyataan berikut.\nInput x = 3 menghasilkan z = 12 .\nInput x = 4 menghasilkan z = 18\nNilai n adalah ...", kategori: "pengetahuan_kuantitatif", tipe: "pilihan_ganda", opsi: ["1", "2", "3", "4", "5"], jawaban: "3" },
-        { pertanyaan: "Apabila presiden dan wakil presiden tidak dapat menjalankan kewajiban dalam masa jabatannya secara bersamaan, maka pelaksanaan tugas kepresidenan adalah.....", kategori: "pkn", tipe: "pilihan_ganda", opsi: ["menteri luar negeri, menteri dalam negeri, dan menteri pertahanan", "menteri luar negeri, menteri pertahanan, dan menteri sekretariat negara", "menteri dalam negeri, menteri hukum dan HAM, serta menteri luar negeri", "menteri pertahanan, menteri hukum dan ham, serta menteri sekretariatan negara", "menteri dalam negeri, menteri pertahanan, serta menteri koordinator politik dan keamanan"], jawaban: "menteri luar negeri, menteri dalam negeri, dan menteri pertahanan" }
+        {
+            pertanyaan: "Dalam sebuah barisan aritmatika, jumlah suku ke-4 dan suku ke-8 adalah 30.\n\nJika suku ke-6 dilambangkan dengan x, maka nilai dari (x² - 10) adalah...",
+            kategori: "mtk", tipe: "pilihan_ganda", opsi: ["195", "205", "215", "225", "235"], jawaban: "215"
+        },
+        {
+            pertanyaan: "Perhatikan reaksi redoks berikut (belum setara):\n\na MnO₄⁻ + b H₂S + c H⁺ → d Mn²⁺ + e S + f H₂O\n\nNilai koefisien a, b, dan c yang paling tepat setelah persamaan disetarakan adalah...",
+            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["2, 5, 6", "2, 5, 16", "2, 3, 8", "1, 5, 8", "2, 5, 8"], jawaban: "2, 5, 16"
+        },
+        {
+            pertanyaan: "Hukum Mendel II (hukum asortasi atau pengelompokan secara bebas) terjadi pada tahapan pembelahan sel secara meiosis, tepatnya pada fase...",
+            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Profase I", "Metafase I", "Anafase I", "Metafase II", "Anafase II"], jawaban: "Metafase I"
+        },
+        {
+            pertanyaan: "Jika si A menyangkal bahwa ia TIDAK mengetahui kejadian perampokan tersebut, dan si B mengatakan bahwa A berbohong.\n\nMaka secara logika, fakta yang sebenarnya adalah...",
+            kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["A mengetahui kejadian tersebut", "A tidak mengetahui kejadian tersebut", "B mengetahui kejadian tersebut", "B adalah perampoknya", "Keduanya tidak tahu menahu"], jawaban: "A mengetahui kejadian tersebut"
+        },
+        {
+            pertanyaan: "Sebuah partikel bergerak melingkar beraturan dengan jari-jari lintasan sebesar R.\n\nJika kecepatan liniernya dijadikan dua kali lipat, maka gaya sentripetal partikel tersebut akan menjadi...",
+            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Sama seperti semula", "Dua kali semula", "Empat kali semula", "Setengah kali semula", "Seperempat kali semula"], jawaban: "Empat kali semula"
+        }
     ];
 
-    const dataInsertRebutan = daftarSoalRebutan.map(soal => ({
+    const soalRebutanDiacak = shuffleArray([...daftarSoalRebutan]);
+
+    const dataInsertRebutan = soalRebutanDiacak.map(soal => ({
         paketSoalId: paketRebutan.id,
         pertanyaan: soal.pertanyaan,
         kategori: soal.kategori,
@@ -146,9 +164,9 @@ async function main() {
     }));
 
     await prisma.soal.createMany({ data: dataInsertRebutan });
-    console.log(`   -> Berhasil memasukkan ${daftarSoalRebutan.length} soal ke dalam ${paketRebutan.nama}`);
+    console.log(`   -> Berhasil memasukkan ${dataInsertRebutan.length} soal ke dalam ${paketRebutan.nama} secara ACAK.`);
 
-    console.log("\n🎉 Seeding Data Semi Final (2 Paket) Selesai!");
+    console.log("\n🎉 Seeding Data Semi Final Selesai!");
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
