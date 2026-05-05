@@ -126,13 +126,38 @@ export const pesertaController = {
                 });
             }
 
+            const namaPaketL = soalAktif.paketSoal.nama.toLowerCase();
+
+            // 👇 SOLUSI: PEMBATASAN AKSES GRUP DI BABAK PENYISIHAN
+            if (soalAktif.paketSoal.babak === 'penyisihan') {
+                let targetGrup = null;
+                if (/\b(a|1)\b/.test(namaPaketL)) targetGrup = 1;
+                else if (/\b(b|2)\b/.test(namaPaketL)) targetGrup = 2;
+                else if (/\b(c|3)\b/.test(namaPaketL)) targetGrup = 3;
+                else if (/\b(d|4)\b/.test(namaPaketL)) targetGrup = 4;
+
+                // Jika Grup Tim TIDAK SAMA dengan Grup Paket, paksa layar HP mereka menjadi 'idle' (Kosong)
+                if (targetGrup !== null && tim.grup !== targetGrup) {
+                    return res.status(200).json({
+                        success: true,
+                        data: null,
+                        sisaWaktuDetik: gameState.sisaWaktu,
+                        isTanpaWaktu: false,
+                        isInputJuri: false,
+                        isPaused: gameState.isPaused,
+                        sudahMenjawab: false,
+                        timPencetBelId: gameState.timPencetBelId,
+                        faseAktif: 'idle'
+                    });
+                }
+            }
+            // 👆 AKHIR PEMBATASAN AKSES GRUP
+
             const riwayat = await prisma.riwayatJawaban.findFirst({ where: { timId, soalId: soalAktif.id } });
             let sisaWaktu = 0;
             let isTanpaWaktu = false;
             let isInputJuri = false;
             const DURASI = parseInt(process.env.DURASI_SOAL) || 180;
-
-            const namaPaketL = soalAktif.paketSoal.nama.toLowerCase();
 
             if (soalAktif.paketSoal.babak === 'final' && (namaPaketL.includes('game 4') || namaPaketL.includes('case'))) {
                 sisaWaktu = 0;
@@ -199,6 +224,8 @@ export const pesertaController = {
                     let targetGrup = null;
                     if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
                     else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
+                    else if (/\b(c|3)\b/.test(namaPaket)) targetGrup = 3;
+                    else if (/\b(d|4)\b/.test(namaPaket)) targetGrup = 4;
 
                     if (targetGrup !== null && tim.grup !== targetGrup) {
                         return res.status(403).json({ success: false, message: "Bukan giliran grup Anda!" });
@@ -261,6 +288,19 @@ export const pesertaController = {
             if (!soal || soal.status !== 'aktif') return res.status(400).json({ success: false, message: "Soal ditutup!" });
 
             const namaPaket = soal.paketSoal.nama.toLowerCase();
+
+            if (soal.paketSoal.babak === 'penyisihan') {
+                let targetGrup = null;
+                if (/\b(a|1)\b/.test(namaPaket)) targetGrup = 1;
+                else if (/\b(b|2)\b/.test(namaPaket)) targetGrup = 2;
+                else if (/\b(c|3)\b/.test(namaPaket)) targetGrup = 3;
+                else if (/\b(d|4)\b/.test(namaPaket)) targetGrup = 4;
+
+                if (targetGrup !== null && tim.grup !== targetGrup) {
+                    return res.status(403).json({ success: false, message: "Bukan giliran grup Anda untuk menjawab!" });
+                }
+            }
+
             const isGame4Final = soal.paketSoal.babak === 'final' && (namaPaket.includes('game 4') || namaPaket.includes('case'));
 
             if (isGame4Final) {
@@ -349,13 +389,8 @@ export const pesertaController = {
             });
             if (!timSaya) return res.status(404).json({ success: false, message: "Tim tidak ditemukan" });
 
-            let filterDaftarTim = { role: 'peserta', grup: timSaya.grup };
-            if (timSaya.tahapAktif === 'semi_final') {
-                filterDaftarTim.skorBabak = { some: { babak: 'semi_final' } };
-            } else {
-                filterDaftarTim.tahapAktif = timSaya.tahapAktif;
-                filterDaftarTim.isEliminated = false;
-            }
+            let filterDaftarTim = { role: 'peserta', tahapAktif: timSaya.tahapAktif };
+            if (timSaya.tahapAktif === 'penyisihan') filterDaftarTim.grup = timSaya.grup;
 
             const daftarTim = await prisma.tim.findMany({
                 where: filterDaftarTim,
