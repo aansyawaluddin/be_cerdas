@@ -299,8 +299,12 @@ export const mulaiSiklusPaket = async (io, paketId) => {
         if (soalBelum.length === 0) {
             console.log(`[GAME] Paket ${paketId} Selesai.`);
 
+            faseAktif = 'idle';
+            soalAktifId = null;
+
             if (infoPaket.babak !== 'penyisihan') {
                 io.emit('paket_selesai', { message: "Ronde ini telah selesai. Sedang merekap poin..." });
+                io.emit('leaderboard_update', { babak: infoPaket.babak });
             } else {
                 io.emit('paket_selesai', { message: "Semua soal di babak ini telah selesai!" });
             }
@@ -518,7 +522,11 @@ export const lanjutSoalBerikutnya = async (io) => {
             where: { paketSoalId: parseInt(paketAktifId), status: 'selesai' }
         });
 
-        if (jumlahSelesai > 0 && jumlahSelesai % 10 === 0 && jumlahSelesai < 50 && faseAktif !== 'strategi') {
+        const totalSoal = await prisma.soal.count({
+            where: { paketSoalId: parseInt(paketAktifId) }
+        });
+
+        if (jumlahSelesai > 0 && jumlahSelesai % 10 === 0 && jumlahSelesai < totalSoal && faseAktif !== 'strategi') {
             console.log(`[GAME] 10 Soal Selesai. Masuk Fase Strategi Berikutnya...`);
             mulaiFaseStrategi(io, paketAktifId);
             return true;

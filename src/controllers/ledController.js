@@ -80,8 +80,13 @@ export const ledController = {
             }
 
             if (!babakAktif) {
-                const cekSemi = await prisma.tim.findFirst({ where: { tahapAktif: 'semi_final' } });
-                babakAktif = cekSemi ? 'semi_final' : 'penyisihan';
+                const cekFinal = await prisma.tim.findFirst({ where: { tahapAktif: 'final' } });
+                if (cekFinal) {
+                    babakAktif = 'final';
+                } else {
+                    const cekSemi = await prisma.tim.findFirst({ where: { tahapAktif: 'semi_final' } });
+                    babakAktif = cekSemi ? 'semi_final' : 'penyisihan';
+                }
             }
 
             let targetGrup = null;
@@ -92,8 +97,8 @@ export const ledController = {
             }
 
             let filterTim = { role: 'peserta' };
-            if (babakAktif === 'semi_final') {
-                filterTim.skorBabak = { some: { babak: 'semi_final' } };
+            if (babakAktif === 'semi_final' || babakAktif === 'final') {
+                filterTim.skorBabak = { some: { babak: babakAktif } };
             } else {
                 filterTim.tahapAktif = babakAktif;
                 filterTim.isEliminated = false;
@@ -157,7 +162,7 @@ export const ledController = {
             const { babak, grup } = req.query;
             const gameState = getGameState();
 
-            let targetBabak = babak || 'penyisihan';
+            let targetBabak = babak || null;
             let targetGrup = grup ? parseInt(grup) : null;
 
             if (gameState.paketAktifId) {
@@ -172,20 +177,31 @@ export const ledController = {
                 }
             }
 
+            if (!targetBabak) {
+                const cekFinal = await prisma.tim.findFirst({ where: { tahapAktif: 'final' } });
+                if (cekFinal) {
+                    targetBabak = 'final';
+                } else {
+                    const cekSemi = await prisma.tim.findFirst({ where: { tahapAktif: 'semi_final' } });
+                    if (cekSemi) targetBabak = 'semi_final';
+                    else targetBabak = 'penyisihan';
+                }
+            }
+
             if (targetBabak === 'penyisihan' && targetGrup === null) {
                 return res.status(200).json({
-                    success: true, message: "Game belum dimulai.",
+                    success: true, message: "Game belum dimulai atau grup tidak spesifik.",
                     data: { podium: [], urutanLainnya: [] }
                 });
             }
 
             let filter = { role: 'peserta' };
-            if (targetBabak === 'semi_final') {
-                filter.skorBabak = { some: { babak: 'semi_final' } };
+            if (targetBabak === 'semi_final' || targetBabak === 'final') {
+                filter.skorBabak = { some: { babak: targetBabak } };
             } else {
                 filter.tahapAktif = targetBabak;
-                filter.isEliminated = false;
             }
+
             if (targetGrup !== null) filter.grup = targetGrup;
 
             const daftarTim = await prisma.tim.findMany({ where: filter, include: { skorBabak: true } });
