@@ -34,5 +34,6 @@ router.post('/reset-semifinal-full', adminController.resetSemiFinalFull);
 router.post('/reset-final-full', adminController.resetFinalFull);
 
 router.post('/bel-reset', adminController.belReset);
+router.post('/akhiri-final', adminController.akhiriFinal);
 
 export default router;

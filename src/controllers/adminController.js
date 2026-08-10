@@ -554,5 +554,17 @@ export const adminController = {
         } catch (error) {
             return res.status(500).json({ success: false, message: error.message });
         }
+    },
+
+    akhiriFinal: async (req, res) => {
+        try {
+            const io = req.app.get('io');
+            if (!io) return res.status(500).json({ success: false, message: "Socket belum siap." });
+            forceStopTimer();
+            io.emit('final_selesai', { message: "Grand Final telah selesai!" });
+            return res.json({ success: true, message: "Event final_selesai berhasil dikirim." });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: error.message });
+        }
     }
 };
