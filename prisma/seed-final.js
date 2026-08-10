@@ -27,7 +27,7 @@ async function main() {
     console.log('✨ Data Final bersih! Memulai proses seeding 4 Game Final UTBK (Diacak & Diformat)...');
 
     // ==========================================
-    // GAME 1: RnB (17 Soal Pilihan Ganda & Esai)
+    // GAME 1: RnB (20 Soal Pilihan Ganda & Esai)
     // ==========================================
     const paketRnB = await prisma.paketSoal.create({ data: { nama: "Final - Game 1 (RnB)", babak: 'final' } });
     const soalRnBAsli = [
@@ -47,7 +47,12 @@ async function main() {
         { q: "Sikap mementingkan diri sendiri secara berlebihan dan mengabaikan kepentingan masyarakat dalam sosiologi dikenal sebagai...", cat: "sosiologi", tipe: "pilihan_ganda", opsi: ["Hedonisme", "Chauvinisme", "Egosentrisme", "Etnosentrisme", "Sekularisme"], ans: "Egosentrisme" },
         { q: "Perhatikan barisan bilangan berikut:\n4, 7, 14, 17, 34, 37, ...\n\nAngka selanjutnya dari pola di atas adalah...", cat: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["40", "64", "70", "74", "80"], ans: "74" },
         { q: "Berapakah pH campuran dari larutan berikut:\n- 100 mL HCl 0,1 M\n- 100 mL NaOH 0,1 M", cat: "ipa", tipe: "pilihan_ganda", opsi: ["1", "3", "5", "7", "9"], ans: "7" },
-        { q: "Menurut hukum permintaan dan penawaran silang, jika harga barang substitusi naik, maka permintaan barang utama akan...", cat: "ekonomi", tipe: "pilihan_ganda", opsi: ["Turun", "Tetap", "Meningkat", "Fluktuatif", "Menjadi elastis sempurna"], ans: "Meningkat" }
+        { q: "Menurut hukum permintaan dan penawaran silang, jika harga barang substitusi naik, maka permintaan barang utama akan...", cat: "ekonomi", tipe: "pilihan_ganda", opsi: ["Turun", "Tetap", "Meningkat", "Fluktuatif", "Menjadi elastis sempurna"], ans: "Meningkat" },
+
+        // --- TAMBAHAN AGAR TOTAL 20 SOAL (SESUAI KETENTUAN) ---
+        { q: "Sebuah kapasitor 4 μF diisi dengan tegangan 12 V.\n\nBesar energi yang tersimpan pada kapasitor tersebut adalah...", cat: "ipa", tipe: "pilihan_ganda", opsi: ["144 μJ", "192 μJ", "288 μJ", "576 μJ", "48 μJ"], ans: "288 μJ" },
+        { q: "Diketahui matriks A berordo 2x2 dengan determinan 5.\n\nBerapakah determinan dari matriks 3A?", cat: "mtk", tipe: "pilihan_ganda", opsi: ["15", "25", "45", "5", "9"], ans: "45" },
+        { q: "Kalimat yang menggunakan kata baku secara konsisten dan tepat adalah...", cat: "b_indo", tipe: "pilihan_ganda", opsi: ["Ia mengubah jadual praktikumnya.", "Ia mengubah jadwal praktikumnya.", "Ia merubah jadwal praktikumnya.", "Ia mengubah jadwal praktikum nya.", "Ia meng-ubah jadwal praktikumnya."], ans: "Ia mengubah jadwal praktikumnya." }
     ];
 
     const soalRnBDiacak = shuffleArray([...soalRnBAsli]);
@@ -63,7 +68,7 @@ async function main() {
             status: "belum"
         }))
     });
-    console.log(`✅ [Game 1] Berhasil memasukkan 17 soal ke ${paketRnB.nama}`);
+    console.log(`✅ [Game 1] Berhasil memasukkan ${soalRnBDiacak.length} soal ke ${paketRnB.nama}`);
 
     // ==========================================
     // GAME 2: SCORE BATTLE (20 Soal Pilihan Ganda)
@@ -108,7 +113,7 @@ async function main() {
     console.log(`✅ [Game 2] Berhasil memasukkan 20 soal ke ${paketScore.nama}`);
 
     // ==========================================
-    // GAME 3: COLLABORATIVE (30 Soal ESAI SINGKAT)
+    // GAME 3: COLLABORATIVE (12 Soal ESAI SINGKAT — 4 soal per anggota tim)
     // ==========================================
     const paketCollab = await prisma.paketSoal.create({ data: { nama: "Final - Game 3 (Collaborative)", babak: 'final' } });
 
@@ -116,33 +121,13 @@ async function main() {
         { q: "Diketahui fungsi f(x):\ny = 5x³ - 2x\n\nBerapakah turunan pertamanya (y')?", cat: "mtk", ans: "15x² - 2" },
         { q: "Diketahui:\nAr C = 12\nAr O = 16\n\nBerapa massa molekul relatif (Mr) dari gas karbon dioksida (CO₂)?", cat: "ipa", ans: "44" },
         { q: "Organel sel pada tumbuhan yang mengandung pigmen hijau dan berfungsi sebagai tempat berlangsungnya fotosintesis adalah...", cat: "ipa", ans: "Kloroplas" },
-        { q: "Siapakah ilmuwan pencetus teori heliosentris yang menyatakan bahwa matahari adalah pusat tata surya (bukan bumi)?", cat: "ipa", ans: "Nicolaus Copernicus" },
         { q: "Tuliskan sinonim (persamaan kata) yang paling tepat dari kata 'EKSKAVASI'!", cat: "b_indo", ans: "Penggalian" },
         { q: "What is the past participle (Verb 3) form of the irregular verb 'sing'?", cat: "b_inggris", ans: "Sung" },
         { q: "Diketahui sistem persamaan linear:\nx + y = 10\nx - y = 4\n\nBerapakah hasil kali dari x dan y (x × y)?", cat: "mtk", ans: "21" },
-        { q: "Peristiwa perpindahan panas yang diikuti oleh perpindahan pergerakan partikel zat perantaranya (seperti merebus air) disebut...", cat: "ipa", ans: "Konveksi" },
         { q: "Dalam sejarah proklamasi, Badan Penyelidik Usaha-usaha Persiapan Kemerdekaan Indonesia biasa disingkat menjadi...", cat: "sejarah", ans: "BPUPKI" },
         { q: "Bentuk sederhana dan hasil penjumlahan dari:\nlog 1000 + log 100\n\nadalah...", cat: "mtk", ans: "5" },
-
-        { q: "Di dalam sebuah kelas terdapat 5 calon pengurus. Akan dipilih 2 orang untuk menempati posisi ketua dan wakil.\n\nBerapakah hasil dari permutasi P(5,2)?", cat: "mtk", ans: "20" },
-        { q: "Senyawa asam lambung manusia pada dasarnya didominasi oleh asam kuat.\n\nTuliskan rumus kimia dari asam lambung tersebut!", cat: "ipa", ans: "HCl" },
         { q: "Sebutkan nama benua terkering, paling datar, dan sekaligus benua terkecil di dunia!", cat: "geografi", ans: "Australia" },
-        { q: "Tuliskan lawan kata (antonim) yang paling tepat dari istilah logika 'APRIORI'!", cat: "b_indo", ans: "Aposteriori" },
-        { q: "Garis lintang 0 derajat yang membelah bumi secara horizontal menjadi kutub utara dan kutub selatan disebut garis...", cat: "geografi", ans: "Khatulistiwa" },
-        { q: "Jika diketahui fungsi linier:\nf(x) = 3x - 1\n\nBerapakah nilai dari fungsi invers f⁻¹(8)?", cat: "mtk", ans: "3" },
-        { q: "Sifat gelombang cahaya yang menyebabkan terjadinya fenomena pelangi (penguraian warna putih menjadi spektrum warna) disebut...", cat: "ipa", ans: "Dispersi" },
-        { q: "Zaman batu muda dalam periodisasi prasejarah manusia purba, di mana manusia mulai mengenal cocok tanam, dikenal dengan istilah...", cat: "sejarah", ans: "Neolitikum" },
-        { q: "What is the noun form (kata benda) of the verb 'decide'?", cat: "b_inggris", ans: "Decision" },
-        { q: "Gaya tarik-menarik antara partikel molekul yang tidak sejenis (misalnya antara tetesan air dengan permukaan kaca) disebut...", cat: "ipa", ans: "Adhesi" },
-
-        { q: "Perhatikan matriks identitas berordo 2x2:\n[ 1  0 ]\n[ 0  1 ]\n\nBerapakah nilai determinannya?", cat: "mtk", ans: "1" },
-        { q: "Proses pembuatan dan sintesis amonia dalam industri kimia secara komersial dikenal dengan nama proses...", cat: "ipa", ans: "Haber-Bosch" },
-        { q: "Bentuk adaptasi fisiologis pada ikan air tawar untuk menjaga keseimbangan osmotik adalah minum sedikit air dan mengeluarkan urin yang bersifat...", cat: "ipa", ans: "Encer" },
-        { q: "Majas yang membandingkan benda mati seolah-olah memiliki sifat hidup atau bertingkah laku layaknya manusia disebut majas...", cat: "b_indo", ans: "Personifikasi" },
         { q: "Lembaga negara Republik Indonesia yang berwenang menguji undang-undang (judicial review) terhadap UUD 1945 adalah...", cat: "pkn", ans: "Mahkamah Konstitusi" },
-        { q: "Jika keliling sebuah persegi panjang adalah 40 cm dan panjangnya adalah 12 cm...\n\nBerapakah luas persegi panjang tersebut (dalam cm²)?", cat: "mtk", ans: "96" },
-        { q: "Alat pengukur intensitas gempa bumi yang dapat menghasilkan rekaman getaran berbentuk grafik (seismogram) disebut...", cat: "geografi", ans: "Seismograf" },
-        { q: "Sebutkan nama Satuan Internasional (SI) yang digunakan untuk mengukur besaran fluks magnetik!", cat: "ipa", ans: "Weber" },
         { q: "Paham atau ideologi ekonomi yang menekankan kebebasan pasar (free market) dan kepemilikan swasta murni tanpa intervensi pemerintah disebut...", cat: "ekonomi", ans: "Kapitalisme" },
         { q: "Sebuah mobil bergerak dipercepat dari keadaan diam hingga mencapai kecepatan 20 m/s dalam kurun waktu 4 detik.\n\nBerapakah percepatan mobil tersebut (dalam m/s²)?", cat: "ipa", ans: "5" }
     ];
@@ -160,7 +145,7 @@ async function main() {
             status: "belum"
         }))
     });
-    console.log(`✅ [Game 3] Berhasil memasukkan 30 soal ESAI SINGKAT ke ${paketCollab.nama}`);
+    console.log(`✅ [Game 3] Berhasil memasukkan ${soalCollabDiacak.length} soal ESAI SINGKAT ke ${paketCollab.nama}`);
 
     // ==========================================
     // GAME 4: CASE BATTLE (3 Soal Esai Analisis UTBK)

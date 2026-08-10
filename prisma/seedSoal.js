@@ -18,7 +18,7 @@ async function main() {
     await prisma.soal.deleteMany({});
     await prisma.paketSoal.deleteMany({});
 
-    console.log('✨ Database bersih! Memulai seeding 35 Bank Soal Penyisihan (Diformat & Diacak)...');
+    console.log('✨ Database bersih! Memulai seeding 40 Bank Soal Penyisihan (Diformat & Diacak)...');
 
     const soalPenyisihanAsli = [
         // --- MTK / PENGETAHUAN KUANTITATIF ---
@@ -62,41 +62,44 @@ async function main() {
         { pertanyaan: "Sebanyak 5,85 gram NaCl (Mr = 58,5) dilarutkan dalam air hingga volume larutan menjadi 500 mL.\n\nMolaritas (konsentrasi) larutan tersebut adalah...", kategori: "ipa", opsi: ["0,05 M", "0,10 M", "0,20 M", "0,40 M", "0,50 M"], jawaban: "0,20 M" },
         { pertanyaan: "Tahapan pada respirasi seluler aerob yang menghasilkan molekul ATP paling banyak terjadi pada...", kategori: "ipa", opsi: ["Glikolisis", "Dekarboksilasi Oksidatif", "Siklus Krebs", "Transpor Elektron", "Fermentasi"], jawaban: "Transpor Elektron" },
         { pertanyaan: "Dua hambatan 4 ohm dan 6 ohm dirangkai paralel, lalu dihubungkan dengan baterai 12 V.\n\nKuat arus total yang mengalir pada rangkaian adalah...", kategori: "ipa", opsi: ["1 A", "2 A", "3 A", "4 A", "5 A"], jawaban: "5 A" },
-        { pertanyaan: "Berapakah pH larutan CH₃COOH 0,1 M (Ka = 10⁻⁵)?", kategori: "ipa", opsi: ["1", "2", "3", "4", "5"], jawaban: "3" }
+        { pertanyaan: "Berapakah pH larutan CH₃COOH 0,1 M (Ka = 10⁻⁵)?", kategori: "ipa", opsi: ["1", "2", "3", "4", "5"], jawaban: "3" },
+
+        // --- TAMBAHAN AGAR TOTAL 40 SOAL (SESUAI KETENTUAN) ---
+        { pertanyaan: "Sebuah kubus memiliki panjang rusuk 6 cm.\n\nJika rusuknya diperbesar menjadi 2 kali lipat, berapa kali lipatkah volume kubus yang baru dibanding volume kubus semula?", kategori: "mtk", opsi: ["2 kali", "4 kali", "6 kali", "8 kali", "16 kali"], jawaban: "8 kali" },
+        { pertanyaan: "Penulisan judul karya tulis yang sesuai kaidah PUEBI adalah...", kategori: "b_indo", opsi: ["Analisis Dampak perubahan Iklim Terhadap Pertanian", "analisis dampak perubahan iklim terhadap pertanian", "Analisis Dampak Perubahan Iklim terhadap Pertanian", "ANALISIS DAMPAK PERUBAHAN IKLIM TERHADAP PERTANIAN", "Analisis, Dampak, Perubahan Iklim, Terhadap Pertanian"], jawaban: "Analisis Dampak Perubahan Iklim terhadap Pertanian" },
+        { pertanyaan: "Despite the heavy rain, the marathon runners ___ to complete the race.", kategori: "b_inggris", opsi: ["managed", "were managed", "had been managed", "manage", "was managing"], jawaban: "managed" },
+        { pertanyaan: "Proses perubahan wujud zat dari gas langsung menjadi padat tanpa melalui fase cair disebut...", kategori: "ipa", opsi: ["Menyublim", "Mengkristal (deposisi)", "Membeku", "Mengembun", "Menguap"], jawaban: "Mengkristal (deposisi)" },
+        { pertanyaan: "Jika 2 pekerja dapat membangun pagar sepanjang 30 meter dalam 5 hari, berapa hari yang dibutuhkan 3 pekerja untuk membangun pagar sepanjang 45 meter dengan kecepatan kerja yang sama?", kategori: "mtk", opsi: ["3 hari", "4 hari", "5 hari", "6 hari", "7 hari"], jawaban: "5 hari" }
     ];
 
-    const namaPaketPenyisihan = ['Paket A - UTBK Lengkap', 'Paket B - UTBK Lengkap'];
+    const paketPenyisihan = await prisma.paketSoal.create({
+        data: {
+            nama: 'Right and Bolt - 12 Tim',
+            babak: 'penyisihan'
+        }
+    });
 
-    for (let p = 0; p < namaPaketPenyisihan.length; p++) {
-        const paketPenyisihan = await prisma.paketSoal.create({
-            data: {
-                nama: namaPaketPenyisihan[p],
-                babak: 'penyisihan'
-            }
-        });
+    console.log(`✅ [${paketPenyisihan.nama}] berhasil dibuat.`);
 
-        console.log(`✅ [${paketPenyisihan.nama}] berhasil dibuat.`);
+    // --- PROSES MENGACAK SOAL ---
+    const soalDiacak = shuffleArray([...soalPenyisihanAsli]);
 
-        // --- PROSES MENGACAK SOAL ---
-        const soalDiacak = shuffleArray([...soalPenyisihanAsli]);
+    const dataInsertPenyisihan = soalDiacak.map(soal => ({
+        pertanyaan: soal.pertanyaan,
+        kategori: soal.kategori,
+        tipe: 'pilihan_ganda',
+        opsiJawaban: soal.opsi,
+        jawabanBenar: soal.jawaban,
+        poin: 25,
+        status: 'belum',
+        waktuMulai: null,
+        paketSoalId: paketPenyisihan.id
+    }));
 
-        const dataInsertPenyisihan = soalDiacak.map(soal => ({
-            pertanyaan: soal.pertanyaan,
-            kategori: soal.kategori,
-            tipe: 'pilihan_ganda',
-            opsiJawaban: soal.opsi,
-            jawabanBenar: soal.jawaban,
-            poin: 25,
-            status: 'belum',
-            waktuMulai: null,
-            paketSoalId: paketPenyisihan.id
-        }));
+    await prisma.soal.createMany({ data: dataInsertPenyisihan });
+    console.log(`   -> Berhasil memasukkan ${dataInsertPenyisihan.length} soal UTBK ke dalam ${paketPenyisihan.nama} secara ACAK.`);
 
-        await prisma.soal.createMany({ data: dataInsertPenyisihan });
-        console.log(`   -> Berhasil memasukkan ${dataInsertPenyisihan.length} soal UTBK ke dalam ${paketPenyisihan.nama} secara ACAK.`);
-    }
-
-    console.log("\n🎉 Seeding Penyisihan 35 Soal (Urutan Acak & Diformat) selesai!");
+    console.log("\n🎉 Seeding Penyisihan 40 Soal (Urutan Acak & Diformat) selesai!");
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

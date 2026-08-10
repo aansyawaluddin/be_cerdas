@@ -10,14 +10,7 @@ let isPaused = false;
 let faseAktif = 'idle';
 let timPencetBelId = null;
 
-let safeTeamsForRebutan = [];
-export const getSafeTeamsForRebutan = () => safeTeamsForRebutan;
-
 export const prosesKlasemenUmum = async (daftarTimAktif, babak) => {
-    if (babak === 'semi_final') {
-        return await prosesKlasemenSemiFinal(daftarTimAktif);
-    }
-
     const timIds = daftarTimAktif.map(t => t.id);
     const semuaRiwayat = await prisma.riwayatJawaban.findMany({
         where: { timId: { in: timIds }, isBenar: true, soal: { paketSoal: { babak: babak } } },
@@ -50,79 +43,6 @@ export const prosesKlasemenUmum = async (daftarTimAktif, babak) => {
     return mapped;
 };
 
-export const prosesKlasemenSemiFinal = async (daftarTimAktif) => {
-    const timIds = daftarTimAktif.map(t => t.id);
-
-    const riwayatSemiFinal = await prisma.riwayatJawaban.findMany({
-        where: { timId: { in: timIds }, soal: { paketSoal: { babak: 'semi_final' } } },
-        include: { soal: { include: { paketSoal: true } } }
-    });
-
-    const mapped = daftarTimAktif.map(tim => {
-        const skorObj = tim.skorBabak ? tim.skorBabak.find(s => s.babak === 'semi_final') : null;
-        const poinTotal = skorObj ? skorObj.poin : (tim.poin || 0);
-
-        const riwayatTim = riwayatSemiFinal.filter(r => r.timId === tim.id);
-
-        const poinRebutan = riwayatTim
-            .filter(r => r.soal.paketSoal.nama.toLowerCase().includes('rebutan'))
-            .reduce((sum, r) => sum + r.poinDidapat, 0);
-
-        const poinMurni = poinTotal - poinRebutan;
-
-        let totalWaktu = 0;
-        riwayatTim.filter(r => r.isBenar).forEach(r => {
-            if (r.soal && r.soal.waktuMulai) {
-                const waktuPencet = r.waktuMenjawab || r.createdAt;
-                if (waktuPencet) {
-                    totalWaktu += new Date(waktuPencet).getTime() - new Date(r.soal.waktuMulai).getTime();
-                }
-            }
-        });
-
-        return { ...tim, poin: poinTotal, poinMurni, poinRebutan, totalWaktu };
-    });
-
-    const klasemenMurni = [...mapped].sort((a, b) => {
-        if (b.poinMurni !== a.poinMurni) return b.poinMurni - a.poinMurni;
-        return a.totalWaktu - b.totalWaktu;
-    });
-
-    let poinBatas = null;
-    if (klasemenMurni.length > 6 && klasemenMurni[5].poinMurni === klasemenMurni[6].poinMurni) {
-        poinBatas = klasemenMurni[5].poinMurni;
-    }
-
-    mapped.sort((a, b) => {
-        if (poinBatas !== null) {
-            const isASafe = a.poinMurni > poinBatas;
-            const isBSafe = b.poinMurni > poinBatas;
-            const isARebutan = a.poinMurni === poinBatas;
-            const isBRebutan = b.poinMurni === poinBatas;
-
-            if (isASafe && !isBSafe) return -1;
-            if (!isASafe && isBSafe) return 1;
-
-            if (isARebutan && !isASafe && !isBSafe && !isBRebutan) return -1;
-            if (!isARebutan && !isASafe && !isBSafe && isBRebutan) return 1;
-
-            if (isARebutan && isBRebutan) {
-                if (b.poinRebutan !== a.poinRebutan) return b.poinRebutan - a.poinRebutan;
-                return a.totalWaktu - b.totalWaktu;
-            }
-        }
-
-        if (b.poinMurni !== a.poinMurni) return b.poinMurni - a.poinMurni;
-        return a.totalWaktu - b.totalWaktu;
-    });
-
-    return mapped.map(t => ({
-        ...t,
-        isAman: poinBatas !== null ? (t.poinMurni > poinBatas) : (klasemenMurni.findIndex(k => k.id === t.id) < 6),
-        isRebutan: poinBatas !== null && t.poinMurni === poinBatas
-    }));
-};
-
 async function hukumTimTidakMenjawab(io, soalId) {
     try {
         const soal = await prisma.soal.findUnique({ where: { id: soalId }, include: { paketSoal: true } });
@@ -131,7 +51,7 @@ async function hukumTimTidakMenjawab(io, soalId) {
         const babak = soal.paketSoal.babak;
         const namaPaketL = soal.paketSoal.nama.toLowerCase();
 
-        const isScoreBattle = (babak === 'semi_final' && !namaPaketL.includes('rebutan')) ||
+        const isScoreBattle = babak === 'semi_final' ||
             (babak === 'final' && (namaPaketL.includes('game 2') || namaPaketL.includes('score battle')));
 
         if (!isScoreBattle) return;
@@ -446,7 +366,6 @@ export const forceStopTimer = () => {
     paketAktifId = null;
     faseAktif = 'idle';
     timPencetBelId = null;
-    safeTeamsForRebutan = [];
 };
 
 export const getGameState = () => {
@@ -476,8 +395,7 @@ export const lanjutSoalBerikutnya = async (io) => {
     if (soalSekarang && soalSekarang.status === 'aktif') {
 
         const namaPaketL = paket.nama.toLowerCase();
-        const isBuzzerAtauJuri = namaPaketL.includes('rebutan') ||
-            namaPaketL.includes('collaborative') ||
+        const isBuzzerAtauJuri = namaPaketL.includes('collaborative') ||
             namaPaketL.includes('game 3') ||
             namaPaketL.includes('case') ||
             namaPaketL.includes('game 4');
@@ -487,14 +405,7 @@ export const lanjutSoalBerikutnya = async (io) => {
                 where: { soalId: soalAktifId }
             });
 
-            let filterTim = { role: 'peserta', tahapAktif: paket.babak, isEliminated: false };
-
-            if (paket.babak === 'penyisihan') {
-                if (/\b(a|1)\b/.test(namaPaketL)) filterTim.grup = 1;
-                else if (/\b(b|2)\b/.test(namaPaketL)) filterTim.grup = 2;
-                else if (/\b(c|3)\b/.test(namaPaketL)) filterTim.grup = 3;
-                else if (/\b(d|4)\b/.test(namaPaketL)) filterTim.grup = 4;
-            }
+            const filterTim = { role: 'peserta', tahapAktif: paket.babak, isEliminated: false };
 
             const totalPesertaSeharusnya = await prisma.tim.count({ where: filterTim });
 
@@ -514,7 +425,7 @@ export const lanjutSoalBerikutnya = async (io) => {
 
     const _nama = paket.nama.toLowerCase();
     const isScoreBattle =
-        (paket.babak === 'semi_final' && !_nama.includes('rebutan')) ||
+        paket.babak === 'semi_final' ||
         (paket.babak === 'final' && (_nama.includes('game 2') || _nama.includes('game2') || _nama.includes('score')));
 
     if (isScoreBattle) {
@@ -591,7 +502,6 @@ async function prosesEliminasiOtomatis(io, soalId) {
             const soalSisa = await prisma.soal.count({ where: { paketSoalId: paketSoalId, status: 'belum' } });
 
             if (soalSisa === 0) {
-                const isRebutan = soal.paketSoal.nama.toLowerCase().includes('rebutan');
                 const daftarTimSemiFinal = await prisma.tim.findMany({
                     where: { tahapAktif: 'semi_final', isEliminated: false },
                     include: { skorBabak: true }
@@ -599,58 +509,23 @@ async function prosesEliminasiOtomatis(io, soalId) {
 
                 const klasemenAkhir = await prosesKlasemenUmum(daftarTimSemiFinal, 'semi_final');
 
-                if (!isRebutan) {
-                    const adaSeriEliminasi = klasemenAkhir.some(t => t.isRebutan);
-
-                    if (adaSeriEliminasi) {
-                        console.log(`[GAME] SERI TERDETEKSI! MENGAKTIFKAN PERISAI...`);
-                        const timGugurPasti = klasemenAkhir.filter(t => !t.isAman && !t.isRebutan);
-                        for (const tim of timGugurPasti) {
-                            await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
-                        }
-                        io.emit('peringatan_seri', { message: "Ada nilai SERI di zona eliminasi! Lanjutkan ke Game Rebutan." });
-                    } else {
-                        console.log(`[GAME] Tidak ada seri. Sapu bersih peringkat 7 ke bawah...`);
-                        const timGugur = klasemenAkhir.slice(6);
-                        for (const tim of timGugur) {
-                            await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
-                        }
-                        await promoteToFinal(klasemenAkhir.slice(0, 6), io);
-                    }
-                } else {
-                    console.log(`[GAME] Babak Rebutan Selesai. Eksekusi Kunci Final...`);
-                    const kuotaAman = klasemenAkhir.filter(t => t.isAman).length;
-                    const kuotaSisa = 6 - kuotaAman;
-
-                    const timRebutan = klasemenAkhir.filter(t => !t.isAman);
-                    const timLolosRebutan = timRebutan.slice(0, kuotaSisa);
-                    const timGugurRebutan = timRebutan.slice(kuotaSisa);
-
-                    for (const tim of timGugurRebutan) {
-                        await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
-                    }
-
-                    const finalis = [...klasemenAkhir.filter(t => t.isAman), ...timLolosRebutan];
-                    await promoteToFinal(finalis, io);
+                console.log(`[GAME] Score Battle selesai. Sapu bersih peringkat 7 ke bawah...`);
+                const timGugur = klasemenAkhir.slice(6);
+                for (const tim of timGugur) {
+                    await prisma.tim.update({ where: { id: tim.id }, data: { isEliminated: true } });
                 }
+                await promoteToFinal(klasemenAkhir.slice(0, 6), io);
             }
             return;
         }
 
         if (babakSekarang === 'penyisihan') {
             const jumlahSelesai = await prisma.soal.count({ where: { paketSoalId: paketSoalId, status: 'selesai' } });
-            const titikEliminasi = [10, 15, 20, 25, 30, 35];
+            const titikEliminasi = [10, 20, 25, 30, 35, 40];
             if (!titikEliminasi.includes(jumlahSelesai)) return;
 
-            let grupAktif = null;
-            const namaPaket = soal.paketSoal.nama.toLowerCase();
-            if (/\b(a|1)\b/.test(namaPaket)) grupAktif = 1;
-            else if (/\b(b|2)\b/.test(namaPaket)) grupAktif = 2;
-
-            if (grupAktif === null) return;
-
             const daftarTim = await prisma.tim.findMany({
-                where: { grup: grupAktif, tahapAktif: 'penyisihan', isEliminated: false },
+                where: { tahapAktif: 'penyisihan', isEliminated: false },
                 include: { skorBabak: true }
             });
 

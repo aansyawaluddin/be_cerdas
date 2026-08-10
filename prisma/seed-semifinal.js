@@ -119,53 +119,6 @@ async function main() {
     await prisma.soal.createMany({ data: dataInsertUtama });
     console.log(`   -> Berhasil memasukkan ${dataInsertUtama.length} soal ke dalam ${paketUtama.nama} secara ACAK.`);
 
-    // ==========================================
-    // 2. BUAT PAKET REBUTAN SEMI FINAL
-    // ==========================================
-    const paketRebutan = await prisma.paketSoal.create({
-        data: { nama: "Semi Final - Rebutan UTBK", babak: 'semi_final' }
-    });
-    console.log(`✅ Paket dibuat: [ID: ${paketRebutan.id}] ${paketRebutan.nama}`);
-
-    const daftarSoalRebutan = [
-        {
-            pertanyaan: "Dalam sebuah barisan aritmatika, jumlah suku ke-4 dan suku ke-8 adalah 30.\n\nJika suku ke-6 dilambangkan dengan x, maka nilai dari (x² - 10) adalah...",
-            kategori: "mtk", tipe: "pilihan_ganda", opsi: ["195", "205", "215", "225", "235"], jawaban: "215"
-        },
-        {
-            pertanyaan: "Perhatikan reaksi redoks berikut (belum setara):\n\na MnO₄⁻ + b H₂S + c H⁺ → d Mn²⁺ + e S + f H₂O\n\nNilai koefisien a, b, dan c yang paling tepat setelah persamaan disetarakan adalah...",
-            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["2, 5, 6", "2, 5, 16", "2, 3, 8", "1, 5, 8", "2, 5, 8"], jawaban: "2, 5, 16"
-        },
-        {
-            pertanyaan: "Hukum Mendel II (hukum asortasi atau pengelompokan secara bebas) terjadi pada tahapan pembelahan sel secara meiosis, tepatnya pada fase...",
-            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Profase I", "Metafase I", "Anafase I", "Metafase II", "Anafase II"], jawaban: "Metafase I"
-        },
-        {
-            pertanyaan: "Jika si A menyangkal bahwa ia TIDAK mengetahui kejadian perampokan tersebut, dan si B mengatakan bahwa A berbohong.\n\nMaka secara logika, fakta yang sebenarnya adalah...",
-            kategori: "penalaran_umum", tipe: "pilihan_ganda", opsi: ["A mengetahui kejadian tersebut", "A tidak mengetahui kejadian tersebut", "B mengetahui kejadian tersebut", "B adalah perampoknya", "Keduanya tidak tahu menahu"], jawaban: "A mengetahui kejadian tersebut"
-        },
-        {
-            pertanyaan: "Sebuah partikel bergerak melingkar beraturan dengan jari-jari lintasan sebesar R.\n\nJika kecepatan liniernya dijadikan dua kali lipat, maka gaya sentripetal partikel tersebut akan menjadi...",
-            kategori: "ipa", tipe: "pilihan_ganda", opsi: ["Sama seperti semula", "Dua kali semula", "Empat kali semula", "Setengah kali semula", "Seperempat kali semula"], jawaban: "Empat kali semula"
-        }
-    ];
-
-    const soalRebutanDiacak = shuffleArray([...daftarSoalRebutan]);
-
-    const dataInsertRebutan = soalRebutanDiacak.map(soal => ({
-        paketSoalId: paketRebutan.id,
-        pertanyaan: soal.pertanyaan,
-        kategori: soal.kategori,
-        tipe: soal.tipe,
-        opsiJawaban: soal.opsi,
-        jawabanBenar: soal.jawaban,
-        poin: 20,
-        status: "belum"
-    }));
-
-    await prisma.soal.createMany({ data: dataInsertRebutan });
-    console.log(`   -> Berhasil memasukkan ${dataInsertRebutan.length} soal ke dalam ${paketRebutan.nama} secara ACAK.`);
-
     console.log("\n🎉 Seeding Data Semi Final Selesai!");
 }
 
