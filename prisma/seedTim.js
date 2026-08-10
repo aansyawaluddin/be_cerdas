@@ -4,13 +4,12 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🏃 Memulai seeding 24 Tim Peserta...');
+    console.log('🏃 Memulai seeding 12 Tim Peserta (Right and Bolt)...');
 
     const commonPassword = await bcrypt.hash('123', 10);
     const teamsData = [];
 
-    for (let i = 1; i <= 24; i++) {
-        const grupId = Math.floor((i - 1) / 12) + 1;
+    for (let i = 1; i <= 12; i++) {
         const order = String(i).padStart(2, '0');
 
         teamsData.push({
@@ -18,7 +17,6 @@ async function main() {
             username: `tim_${order}`,
             password: commonPassword,
             fotoTim: `default_foto.png`,
-            grup: grupId,
             role: 'peserta',
             tahapAktif: 'penyisihan'
         });
@@ -29,8 +27,8 @@ async function main() {
         skipDuplicates: true,
     });
 
-    console.log('✅ 24 Tim berhasil didaftarkan ke Database.');
-    console.log('📊 Distribusi: 12 Tim per Grup (Grup 1 dan Grup 2).');
+    console.log('✅ 12 Tim berhasil didaftarkan ke Database.');
+    console.log('📊 Sesuai ketentuan: 12 Tim bertanding bersamaan di Babak Right and Bolt.');
 }
 
 main()
